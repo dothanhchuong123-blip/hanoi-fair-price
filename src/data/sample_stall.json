@@ -1,0 +1,14 @@
+{
+  "image_type": "stall",
+  "items": [
+    {
+      "name_vi": "Xoài",
+      "name_en": "Mango",
+      "category": "fruit",
+      "price_vnd": 80000,
+      "unit": "kg",
+      "box_2d": [170, 140, 740, 860],
+      "confidence": 0.88
+    }
+  ]
+}

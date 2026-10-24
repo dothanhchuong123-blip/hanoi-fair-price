@@ -1,0 +1,11 @@
+{
+  "name": "Chợ Price Lens",
+  "description": "A playful spatial-AI price checker for tourists and locals in Hanoi's Old Quarter (Phố cổ).",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

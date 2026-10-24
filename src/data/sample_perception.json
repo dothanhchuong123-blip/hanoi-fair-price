@@ -1,0 +1,68 @@
+{
+  "image_type": "menu",
+  "items": [
+    {
+      "name_vi": "Phở bò",
+      "name_en": "Beef noodle soup",
+      "category": "street_food",
+      "price_vnd": 60000,
+      "unit": "bát",
+      "box_2d": [238, 118, 304, 858],
+      "confidence": 0.96
+    },
+    {
+      "name_vi": "Bún chả",
+      "name_en": "Grilled pork & noodles",
+      "category": "street_food",
+      "price_vnd": 120000,
+      "unit": "suất",
+      "box_2d": [308, 121, 374, 861],
+      "confidence": 0.95
+    },
+    {
+      "name_vi": "Bánh mì",
+      "name_en": "Vietnamese baguette",
+      "category": "street_food",
+      "price_vnd": 30000,
+      "unit": "chiếc",
+      "box_2d": [378, 124, 444, 864],
+      "confidence": 0.96
+    },
+    {
+      "name_vi": "Nem rán",
+      "name_en": "Crispy spring rolls",
+      "category": "street_food",
+      "price_vnd": 70000,
+      "unit": "đĩa",
+      "box_2d": [448, 127, 514, 867],
+      "confidence": 0.92
+    },
+    {
+      "name_vi": "Cà phê trứng",
+      "name_en": "Hanoi egg coffee",
+      "category": "drink",
+      "price_vnd": 45000,
+      "unit": "cốc",
+      "box_2d": [518, 130, 584, 870],
+      "confidence": 0.96
+    },
+    {
+      "name_vi": "Trà đá",
+      "name_en": "Iced tea",
+      "category": "drink",
+      "price_vnd": 15000,
+      "unit": "cốc",
+      "box_2d": [588, 133, 654, 873],
+      "confidence": 0.97
+    },
+    {
+      "name_vi": "Bia hơi",
+      "name_en": "Fresh draft beer",
+      "category": "drink",
+      "price_vnd": 25000,
+      "unit": "cốc",
+      "box_2d": [658, 136, 724, 876],
+      "confidence": 0.94
+    }
+  ]
+}

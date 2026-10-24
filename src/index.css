@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #F6EFE1;
+  --paper-2: #EFE4CE;
+  --ink: #2A2118;
+  --ink-2: #6B5E4E;
+  --mustard: #E3A82B;
+  --mustard-dark: #B9831A;
+  --shutter: #2F6B4F;
+  --shutter-dark: #1F4A36;
+  --fair: #3E9B5F;
+  --high: #E8962C;
+  --over: #D9483B;
+  --unsure: #8A8174;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #1c1610;
+  color: var(--ink);
+  font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+.font-display {
+  font-family: "Baloo 2", cursive, sans-serif;
+  font-weight: 800;
+}
+
+.font-body {
+  font-family: "Be Vietnam Pro", sans-serif;
+}
+
+.font-hand {
+  font-family: "Itim", cursive, sans-serif;
+}
+
+.camera-bg {
+  background: radial-gradient(circle at 50% 42%, #5a4632 0%, #2a2018 58%, #120e0a 100%);
+}
+
+.dark-glass-pill {
+  background: rgba(20, 16, 12, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-mustard {
+  background-color: var(--mustard);
+  color: var(--ink);
+  box-shadow: 0 4px 0 var(--mustard-dark);
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-mustard:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--mustard-dark);
+}
+
+.btn-shutter {
+  background-color: var(--shutter);
+  color: #FFFFFF;
+  box-shadow: 0 4px 0 var(--shutter-dark);
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-shutter:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--shutter-dark);
+}
+
+.btn-paper {
+  background-color: #FAF5EB;
+  color: var(--ink);
+  border: 1.5px solid #DFD3BC;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease;
+}
+
+.btn-paper:active {
+  transform: translateY(1px);
+  background-color: var(--paper-2);
+}
+
+.numpad-key {
+  background-color: #FFFFFF;
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 2px 0 #DFD3BC;
+  transition: transform 100ms ease, background-color 100ms ease;
+}
+
+.numpad-key:active {
+  transform: translateY(2px);
+  background-color: var(--paper-2);
+}
+
+.sticker-tag {
+  background-color: #fffaf0;
+  border: 2.5px solid #ffffff;
+  transform: rotate(-1.5deg);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+}
+
+/* Transform-only animation (no layout work per frame), so it stays smooth on mid-range phones */
+@keyframes scanBeam {
+  0% {
+    transform: translateY(-78%);
+    opacity: 0.3;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0%);
+    opacity: 0.3;
+  }
+}
+
+.scan-beam {
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 194, 76, 0) calc(100% - 64px),
+    rgba(245, 194, 76, 0.35) calc(100% - 14px),
+    rgba(252, 224, 136, 0.9) calc(100% - 3px),
+    #fce592 100%
+  );
+  will-change: transform;
+  animation: scanBeam 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-sheet-up {
+  animation: sheetUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 220ms ease-out both;
+}
+
+@keyframes shutterGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(227, 168, 43, 0.65);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(227, 168, 43, 0);
+  }
+}
+
+.animate-shutter-glow {
+  animation: shutterGlow 1.2s ease-out infinite;
+}
+
+@keyframes tagPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-6deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-1deg);
+  }
+}
+
+.animate-tag-pop {
+  opacity: 0;
+  animation: tagPop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes stampThunk {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-18deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.92) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-stamp-thunk {
+  animation: stampThunk 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
