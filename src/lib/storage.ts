@@ -2,6 +2,32 @@ import { CrowdReport } from '../agent/types';
 
 const REPORTS_KEY = 'cho_price_lens_crowd_reports_v1';
 const PASSPORT_KEY = 'cho_price_lens_passport_v2';
+const ONBOARDING_KEY = 'onboardingDone';
+
+export function getOnboardingDone(): boolean {
+  try {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('autostart') === '1') return true;
+    }
+    const val = localStorage.getItem(ONBOARDING_KEY);
+    return val === 'true' || val === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setOnboardingDone(done = true): void {
+  try {
+    if (done) {
+      localStorage.setItem(ONBOARDING_KEY, 'true');
+    } else {
+      localStorage.removeItem(ONBOARDING_KEY);
+    }
+  } catch {
+    // Ignore localStorage security or quota errors
+  }
+}
 
 export interface PassportStamp {
   id: string;

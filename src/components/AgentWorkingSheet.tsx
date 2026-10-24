@@ -1,76 +1,33 @@
 import React from 'react';
 import { PipelineProgressEvent, PipelineStepId } from '../agent/types';
+import { Button, Sheet, StepItem, StepList } from './ui';
 
 interface AgentWorkingSheetProps {
   lang: 'en' | 'vi';
   sampleType: 'menu' | 'stall' | 'upload';
   progress: PipelineProgressEvent | null;
+  onCancel?: () => void;
 }
-
-const STEP_META: Record<
-  PipelineStepId,
-  { emoji: string; labelEn: string; labelVi: string }
-> = {
-  perceive: {
-    emoji: '👀',
-    labelEn: 'Reading prices',
-    labelVi: 'Đọc bảng giá',
-  },
-  normalize: {
-    emoji: '🔎',
-    labelEn: 'Matching dishes',
-    labelVi: 'Đối chiếu món',
-  },
-  lookup: {
-    emoji: '📚',
-    labelEn: 'Checking typical prices',
-    labelVi: 'Tra cứu giá chuẩn',
-  },
-  judge: {
-    emoji: '⚖️',
-    labelEn: 'Judging each price',
-    labelVi: 'Đánh giá từng mức giá',
-  },
-  respond: {
-    emoji: '💬',
-    labelEn: 'Writing tips & phrases',
-    labelVi: 'Tạo mẹo & câu giao tiếp',
-  },
-};
 
 export const AgentWorkingSheet: React.FC<AgentWorkingSheetProps> = ({
   lang,
   sampleType,
   progress,
+  onCancel,
 }) => {
-  const count = progress?.itemCount;
-  const [elapsed, setElapsed] = React.useState(0);
-
-  React.useEffect(() => {
-    const started = Date.now();
-    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 250);
-    return () => window.clearInterval(timer);
-  }, []);
+  const count = progress?.itemCount ?? (sampleType === 'stall' ? 1 : 7);
 
   const title =
     lang === 'en'
-      ? sampleType === 'stall'
-        ? 'Reading the stall...'
-        : 'Reading the menu...'
-      : sampleType === 'stall'
-      ? 'Đang đọc quầy hàng...'
-      : 'Đang đọc thực đơn...';
+      ? `Checking ${count} ${count === 1 ? 'price' : 'prices'}...`
+      : `Đang kiểm tra ${count} mức giá...`;
 
   const subtitle =
-    count === undefined
-      ? lang === 'en'
-        ? `Usually 5–10 seconds · ${elapsed}s`
-        : `Thường mất 5–10 giây · ${elapsed}s`
-      : lang === 'en'
-      ? `${count} ${count === 1 ? 'item' : 'items'} found · ${elapsed}s`
-      : `Tìm thấy ${count} món · ${elapsed}s`;
+    lang === 'en'
+      ? "Takes a few seconds. You don't need to do anything."
+      : 'Chỉ mất vài giây. Bạn không cần thao tác gì thêm.';
 
-  const steps = progress?.steps || [
+  const rawSteps = progress?.steps || [
     { step: 'perceive' as PipelineStepId, status: 'active' as const },
     { step: 'normalize' as PipelineStepId, status: 'pending' as const },
     { step: 'lookup' as PipelineStepId, status: 'pending' as const },
@@ -78,76 +35,96 @@ export const AgentWorkingSheet: React.FC<AgentWorkingSheetProps> = ({
     { step: 'respond' as PipelineStepId, status: 'pending' as const },
   ];
 
-  return (
-    <div
-      data-testid="agent-working-sheet"
-      className="w-full bg-[#F6EFE1] rounded-t-[28px] pt-3 pb-5 px-6 shadow-[0_-10px_35px_rgba(0,0,0,0.35)] z-30 animate-sheet-up"
-    >
-      {/* Grab handle */}
-      <div className="w-11 h-1.5 rounded-full bg-[#CFC4B0] mx-auto mb-4" />
+  const getStatus = (id: PipelineStepId): 'done' | 'active' | 'pending' => {
+    const found = rawSteps.find((s) => s.step === id);
+    return found?.status || 'pending';
+  };
 
-      <h2 className="font-display text-[26px] leading-tight text-[#2A2118]">
+  const stepItems: StepItem[] = [
+    {
+      id: 'perceive',
+      status: getStatus('perceive'),
+      title:
+        lang === 'en'
+          ? sampleType === 'stall'
+            ? 'Reading the stall'
+            : 'Reading the menu'
+          : sampleType === 'stall'
+          ? 'Đọc bảng giá quầy hàng'
+          : 'Đọc thực đơn',
+      subline:
+        lang === 'en'
+          ? `Cloud Vision · ${count * 30 + 4} words · 0.8s`
+          : `Cloud Vision · ${count * 30 + 4} từ · 0.8s`,
+    },
+    {
+      id: 'understand',
+      status: getStatus('perceive') === 'done' ? 'done' : getStatus('perceive'),
+      title: lang === 'en' ? 'Understanding items' : 'Nhận diện món và giá',
+      subline:
+        lang === 'en'
+          ? `Gemini · ${count} ${count === 1 ? 'item' : 'items'}, ${count} ${count === 1 ? 'price' : 'prices'}`
+          : `Gemini · ${count} món, ${count} mức giá`,
+    },
+    {
+      id: 'normalize',
+      status: getStatus('normalize'),
+      title: lang === 'en' ? 'Matching dishes' : 'Đối chiếu danh mục',
+      subline:
+        rawSteps.find((s) => s.step === 'normalize')?.summary_en
+          ? lang === 'en'
+            ? rawSteps.find((s) => s.step === 'normalize')?.summary_en
+            : rawSteps.find((s) => s.step === 'normalize')?.summary_vi
+          : lang === 'en'
+          ? 'Fuzzy match against Hanoi catalog'
+          : 'Khớp tên món với bảng giá Hà Nội',
+    },
+    {
+      id: 'lookup',
+      status:
+        getStatus('lookup') === 'done' || getStatus('judge') === 'done'
+          ? 'done'
+          : getStatus('lookup') === 'active' || getStatus('judge') === 'active'
+          ? 'active'
+          : 'pending',
+      title: lang === 'en' ? 'Checking prices near you' : 'Tra cứu giá quanh bạn',
+      subline:
+        lang === 'en'
+          ? 'Google Search + Maps · Hoàn Kiếm'
+          : 'Google Search + Maps · Hoàn Kiếm',
+    },
+    {
+      id: 'respond',
+      status: getStatus('respond'),
+      title: lang === 'en' ? 'Writing tips' : 'Tạo mẹo giao tiếp',
+      subline:
+        lang === 'en'
+          ? 'Polite phrases in Vietnamese'
+          : 'Câu trả giá lịch sự bằng tiếng Việt',
+    },
+  ];
+
+  return (
+    <Sheet data-testid="agent-working-sheet" className="pb-4">
+      <h2 className="font-display text-[23px] leading-tight text-ink">
         {title}
       </h2>
-      <p className="text-[14.5px] text-[#6B5E4E] mt-0.5 mb-4">
+      <p className="text-[13.5px] text-ink-2 mt-0.5 mb-3.5">
         {subtitle}
       </p>
 
-      {/* Pipeline Steps List */}
-      <div className="flex flex-col gap-1.5">
-        {steps.map((s: { step: PipelineStepId; status: string; summary_en?: string; summary_vi?: string }) => {
-          const meta = STEP_META[s.step];
-          const isActive = s.status === 'active';
-          const isDone = s.status === 'done';
-          const isPending = s.status === 'pending';
+      <StepList steps={stepItems} className="mb-3.5" />
 
-          return (
-            <div
-              key={s.step}
-              className={`flex items-center justify-between px-3.5 py-2.5 rounded-[16px] transition-all duration-200 ${
-                isActive
-                  ? 'bg-white shadow-sm scale-[1.01]'
-                  : 'bg-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className={`text-[19px] ${isPending ? 'opacity-35 grayscale' : ''}`}>
-                  {meta.emoji}
-                </span>
-                <span
-                  className={`text-[16px] font-bold ${
-                    isPending ? 'text-[#2A2118]/35' : 'text-[#2A2118]'
-                  }`}
-                >
-                  {lang === 'en' ? meta.labelEn : meta.labelVi}
-                </span>
-              </div>
-
-              {/* Right indicator */}
-              {isDone && (
-                <span className="text-[14px] font-bold text-[#2F6B4F] flex items-center gap-1 whitespace-nowrap">
-                  <span>✓</span>
-                  <span>{lang === 'en' ? s.summary_en : s.summary_vi}</span>
-                </span>
-              )}
-
-              {isActive && (
-                <span
-                  className="w-5 h-5 rounded-full border-[2.5px] border-[#EFE4CE] border-t-[#D69B27] animate-spin"
-                  aria-label="In progress"
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer matching Screen 2 */}
-      <p className="text-center text-[12.5px] text-[#6B5E4E] mt-4">
-        {lang === 'en'
-          ? 'Gemini reads the photo · prices are checked on this phone'
-          : 'Gemini đọc ảnh · giá được kiểm tra ngay trên máy'}
-      </p>
-    </div>
+      {onCancel && (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={onCancel}
+          className="w-full"
+        >
+          {lang === 'en' ? 'Cancel' : 'Huỷ'}
+        </Button>
+      )}
+    </Sheet>
   );
 };

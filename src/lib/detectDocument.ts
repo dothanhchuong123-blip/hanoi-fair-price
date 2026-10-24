@@ -7,6 +7,8 @@
  * the region apart, so its bounding box still traces the sheet.
  */
 
+import { detectQuad, isOpenCvReady, QuadCorners, warpFlat } from './menuQuad';
+
 /** Normalized 0-1 box in the frame that was analysed */
 export interface DocBox {
   x: number;
@@ -53,8 +55,8 @@ function otsu(gray: Uint8Array): { threshold: number; variance: number } {
   return best;
 }
 
-/** Detects the sheet inside `source` (optionally only the given source rect). */
-export function detectDocument(
+/** Fallback brightness heuristic: detects the sheet inside `source` (optionally only the given source rect). */
+export function detectDocumentFallback(
   source: CanvasImageSource,
   srcRect: { sx: number; sy: number; sw: number; sh: number }
 ): DocBox | null {
@@ -117,6 +119,36 @@ export function detectDocument(
   return { x: best.minX / w, y: best.minY / h, w: bw / w, h: bh / h };
 }
 
+/**
+ * Detects the sheet inside `source`. Uses OpenCV `detectQuad` when loaded,
+ * falling back to `detectDocumentFallback` while OpenCV is still loading.
+ */
+export function detectDocument(
+  source: CanvasImageSource,
+  srcRect: { sx: number; sy: number; sw: number; sh: number }
+): DocBox | null {
+  if (isOpenCvReady()) {
+    const w = 320;
+    const h = Math.max(1, Math.round((srcRect.sh / srcRect.sw) * w));
+    const ctx = getScratch(w, h);
+    if (ctx && scratch) {
+      ctx.drawImage(source, srcRect.sx, srcRect.sy, srcRect.sw, srcRect.sh, 0, 0, w, h);
+      const quad = detectQuad(scratch);
+      if (quad) {
+        const xs = quad.map((p) => p.x / w);
+        const ys = quad.map((p) => p.y / h);
+        const minX = Math.max(0, Math.min(...xs));
+        const minY = Math.max(0, Math.min(...ys));
+        const maxX = Math.min(1, Math.max(...xs));
+        const maxY = Math.min(1, Math.max(...ys));
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+      }
+      return null;
+    }
+  }
+  return detectDocumentFallback(source, srcRect);
+}
+
 /** Pads a box by `pad` (fraction of its size) and clamps it to the frame. */
 export function padBox(box: DocBox, pad = 0.03): DocBox {
   const x = Math.max(0, box.x - box.w * pad);
@@ -166,7 +198,34 @@ export async function cropPhotoToDocument(dataUrl: string): Promise<{ dataUrl: s
   });
   if (!loaded) return { dataUrl, cropped: false };
   const rect = { sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight };
-  const box = detectDocument(img, rect);
+
+  if (isOpenCvReady()) {
+    const w = 320;
+    const h = Math.max(1, Math.round((rect.sh / rect.sw) * w));
+    const ctx = getScratch(w, h);
+    if (ctx && scratch) {
+      ctx.drawImage(img, 0, 0, rect.sw, rect.sh, 0, 0, w, h);
+      const quad = detectQuad(scratch);
+      if (quad) {
+        const fullCanvas = document.createElement('canvas');
+        fullCanvas.width = rect.sw;
+        fullCanvas.height = rect.sh;
+        const fullCtx = fullCanvas.getContext('2d');
+        if (fullCtx) {
+          fullCtx.drawImage(img, 0, 0);
+          const fullCorners = quad.map((p) => ({
+            x: (p.x / w) * rect.sw,
+            y: (p.y / h) * rect.sh,
+          })) as QuadCorners;
+          const flat = warpFlat(fullCanvas, fullCorners);
+          return { dataUrl: flat.toDataURL('image/jpeg', 0.85), cropped: true };
+        }
+      }
+    }
+  }
+
+  const box = detectDocumentFallback(img, rect);
   const out = renderCrop(img, rect, box ? padBox(box) : null);
   return out ? { dataUrl: out, cropped: Boolean(box) } : { dataUrl, cropped: false };
 }
+

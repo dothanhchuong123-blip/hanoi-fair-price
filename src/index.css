@@ -1,18 +1,98 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #F6EFE1;
-  --paper-2: #EFE4CE;
-  --ink: #2A2118;
-  --ink-2: #6B5E4E;
-  --mustard: #E3A82B;
-  --mustard-dark: #B9831A;
-  --shutter: #2F6B4F;
-  --shutter-dark: #1F4A36;
-  --fair: #3E9B5F;
-  --high: #E8962C;
-  --over: #D9483B;
-  --unsure: #8A8174;
+  /* Surfaces */
+  --bg: #F7F5F0;
+  --surface: #FFFFFF;
+  --surface-2: #EFECE5;
+  --surface-3: #E5E0D6;
+  --line: #E6E2D8;
+  --grabber: #DCD8CE;
+
+  /* Typography / Ink */
+  --ink: #15130F;
+  --ink-2: #6B665C;
+  --ink-3: #9A9488;
+
+  /* Single Accent: Brand Blue */
+  --brand: #2F5BFF;
+  --brand-soft: #EBF0FF;
+
+  /* Price Verdicts ONLY */
+  --fair: #16A36A;
+  --fair-soft: #DCFCE7;
+  --fair-tint: rgba(22, 163, 106, 0.10);
+
+  --warn: #E08A00;
+  --warn-soft: #FEF0D6;
+  --warn-tint: rgba(224, 138, 0, 0.10);
+
+  --bad: #E5484D;
+  --bad-soft: #FFE5E6;
+  --bad-tint: rgba(229, 72, 77, 0.10);
+
+  --unsure: #7C7C86;
+  --unsure-soft: #ECEDF0;
+  --unsure-tint: rgba(124, 124, 134, 0.10);
+
+  /* Camera & Glass */
+  --camera: #08080A;
+  --glass-bg: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.16);
+
+  /* Radii */
+  --r-xs: 10px;
+  --r-sm: 14px;
+  --r-md: 20px;
+  --r-lg: 28px;
+  --r-pill: 9999px;
+
+  /* Fonts */
+  --font-sans: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-grabber: var(--grabber);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-fair: var(--fair);
+  --color-fair-soft: var(--fair-soft);
+
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-high: var(--warn);
+  --color-high-soft: var(--warn-soft);
+
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-over: var(--bad);
+  --color-over-soft: var(--bad-soft);
+
+  --color-unsure: var(--unsure);
+  --color-unsure-soft: var(--unsure-soft);
+
+  --color-camera: var(--camera);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 * {
@@ -20,101 +100,56 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  background-color: #1c1610;
+  background-color: #E5E1D8;
   color: var(--ink);
-  font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
 
 .font-display {
-  font-family: "Baloo 2", cursive, sans-serif;
+  font-family: var(--font-sans);
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .font-body {
-  font-family: "Be Vietnam Pro", sans-serif;
+  font-family: var(--font-sans);
 }
 
-.font-hand {
-  font-family: "Itim", cursive, sans-serif;
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .camera-bg {
-  background: radial-gradient(circle at 50% 42%, #5a4632 0%, #2a2018 58%, #120e0a 100%);
+  background-color: var(--camera);
 }
 
-.dark-glass-pill {
-  background: rgba(20, 16, 12, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
 }
 
-.btn-mustard {
-  background-color: var(--mustard);
-  color: var(--ink);
-  box-shadow: 0 4px 0 var(--mustard-dark);
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.btn-mustard:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--mustard-dark);
-}
-
-.btn-shutter {
-  background-color: var(--shutter);
-  color: #FFFFFF;
-  box-shadow: 0 4px 0 var(--shutter-dark);
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-shutter:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--shutter-dark);
-}
-
-.btn-paper {
-  background-color: #FAF5EB;
-  color: var(--ink);
-  border: 1.5px solid #DFD3BC;
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease;
-}
-
-.btn-paper:active {
-  transform: translateY(1px);
-  background-color: var(--paper-2);
-}
-
-.numpad-key {
-  background-color: #FFFFFF;
-  color: var(--ink);
-  border-radius: 16px;
-  box-shadow: 0 2px 0 #DFD3BC;
-  transition: transform 100ms ease, background-color 100ms ease;
-}
-
-.numpad-key:active {
-  transform: translateY(2px);
-  background-color: var(--paper-2);
-}
-
-.sticker-tag {
-  background-color: #fffaf0;
-  border: 2.5px solid #ffffff;
-  transform: rotate(-1.5deg);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
-}
-
-/* Transform-only animation (no layout work per frame), so it stays smooth on mid-range phones */
 @keyframes scanBeam {
   0% {
     transform: translateY(-78%);
-    opacity: 0.3;
+    opacity: 0.25;
   }
   15%,
   85% {
@@ -122,7 +157,7 @@ html, body {
   }
   100% {
     transform: translateY(0%);
-    opacity: 0.3;
+    opacity: 0.25;
   }
 }
 
@@ -130,10 +165,10 @@ html, body {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(245, 194, 76, 0) calc(100% - 64px),
-    rgba(245, 194, 76, 0.35) calc(100% - 14px),
-    rgba(252, 224, 136, 0.9) calc(100% - 3px),
-    #fce592 100%
+    rgba(47, 91, 255, 0) calc(100% - 56px),
+    rgba(47, 91, 255, 0.22) calc(100% - 10px),
+    rgba(47, 91, 255, 0.85) calc(100% - 2px),
+    #2F5BFF 100%
   );
   will-change: transform;
   animation: scanBeam 1.8s ease-in-out infinite alternate;
@@ -141,7 +176,7 @@ html, body {
 
 @keyframes sheetUp {
   from {
-    transform: translateY(24px);
+    transform: translateY(20px);
     opacity: 0;
   }
   to {
@@ -151,7 +186,7 @@ html, body {
 }
 
 .animate-sheet-up {
-  animation: sheetUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: sheetUp 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes fadeIn {
@@ -164,60 +199,7 @@ html, body {
 }
 
 .animate-fade-in {
-  animation: fadeIn 220ms ease-out both;
-}
-
-@keyframes shutterGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(227, 168, 43, 0.65);
-  }
-  50% {
-    box-shadow: 0 0 0 12px rgba(227, 168, 43, 0);
-  }
-}
-
-.animate-shutter-glow {
-  animation: shutterGlow 1.2s ease-out infinite;
-}
-
-@keyframes tagPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.5) rotate(-6deg);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1.08) rotate(2deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(-1deg);
-  }
-}
-
-.animate-tag-pop {
-  opacity: 0;
-  animation: tagPop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes stampThunk {
-  0% {
-    opacity: 0;
-    transform: scale(2.2) rotate(-18deg);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(0.92) rotate(4deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-.animate-stamp-thunk {
-  animation: stampThunk 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: fadeIn 180ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {

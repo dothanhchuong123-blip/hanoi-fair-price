@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { ChevronLeft, Delete, Search } from 'lucide-react';
 import { getAllReferences } from '../agent/lookup';
 import { PriceReference } from '../agent/types';
 import { convertUnitPrice, formatDotVnd, formatShortVnd, formatUsd } from '../lib/parsePrice';
+import { Button, Chip, IconButton } from './ui';
 
 interface QuickQuoteViewProps {
   lang: 'en' | 'vi';
@@ -44,7 +46,6 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     [catalog, selectedId]
   );
 
-  // Filter items by search or show the 8 featured icons from Screen 7
   const displayedItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) {
@@ -62,7 +63,6 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
       .slice(0, 8);
   }, [catalog, searchQuery]);
 
-  // Parse current numpad string into VND
   const numericVnd = useMemo(() => {
     const clean = priceStr.trim().toLowerCase();
     if (!clean) return 0;
@@ -90,7 +90,6 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
 
   const handleDigitPress = (digit: string) => {
     setPriceStr((prev) => {
-      // If it currently ends with 'k', replace or append before 'k'
       const withoutK = prev.endsWith('k') ? prev.slice(0, -1) : prev;
       if (withoutK.length >= 6) return prev;
       const nextDigits = withoutK === '0' ? digit : withoutK + digit;
@@ -123,36 +122,35 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   return (
     <div
       data-testid="quick-quote-view"
-      className="w-full min-h-full bg-[#F6EFE1] text-[#2A2118] flex flex-col px-4 pt-3.5 pb-5"
+      className="w-full min-h-full bg-bg text-ink flex flex-col px-4 pt-3.5 pb-5"
     >
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-3">
-        <button
-          type="button"
+        <IconButton
+          variant="default"
           onClick={onBack}
           aria-label="Back to camera"
-          className="w-11 h-11 rounded-full bg-white border border-[#E4D9C5] shadow-xs flex items-center justify-center text-[19px] text-[#2A2118] cursor-pointer"
         >
-          ←
-        </button>
+          <ChevronLeft className="w-5 h-5 text-ink" />
+        </IconButton>
 
-        <h1 className="font-display text-[23px] text-[#2A2118]">
+        <h1 className="font-display text-[21px] text-ink">
           {lang === 'en' ? 'Quick quote' : 'Nhập giá nhanh'}
         </h1>
 
-        <button
-          type="button"
+        <IconButton
+          variant="default"
           onClick={onToggleLang}
           aria-label="Toggle language"
-          className="w-11 h-11 rounded-full bg-white border border-[#E4D9C5] shadow-xs flex items-center justify-center font-bold text-[14px] text-[#2A2118] cursor-pointer"
+          className="font-bold text-[13px]"
         >
           {lang.toUpperCase()}
-        </button>
+        </IconButton>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-[#FCF9F2] rounded-[16px] px-3.5 h-[46px] flex items-center gap-2.5 border border-[#EBE1CE] mb-3">
-        <span className="text-[16px]" aria-hidden="true">🔍</span>
+      <div className="bg-surface rounded-[14px] px-3.5 h-[44px] flex items-center gap-2.5 border border-line mb-3">
+        <Search className="w-4 h-4 text-ink-3 shrink-0" />
         <input
           type="search"
           value={searchQuery}
@@ -161,11 +159,11 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
             lang === 'en' ? 'Search phở, cà phê, xoài...' : 'Tìm phở, cà phê, xoài...'
           }
           aria-label="Search Hanoi items"
-          className="w-full bg-transparent text-[15px] text-[#2A2118] placeholder-[#6B5E4E] focus:outline-none"
+          className="w-full bg-transparent text-[15px] text-ink placeholder-ink-3 focus:outline-none"
         />
       </div>
 
-      {/* 4x2 Item Grid matching Screen 7 */}
+      {/* 4x2 Item Grid */}
       <div className="grid grid-cols-4 gap-2 mb-3">
         {displayedItems.map((ref) => {
           const isSelected = ref.id === selectedRef.id;
@@ -175,14 +173,14 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
               key={ref.id}
               type="button"
               onClick={() => handleSelectDish(ref)}
-              className={`rounded-[18px] py-2.5 px-1.5 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+              className={`rounded-[16px] py-2.5 px-1.5 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-[#FBF0D4] border-2 border-[#E3A82B] shadow-xs'
-                  : 'bg-[#FCF9F2] border border-[#EBE1CE]'
+                  ? 'bg-brand-soft border-2 border-brand shadow-2xs'
+                  : 'bg-surface border border-line hover:bg-surface-2'
               }`}
             >
-              <span className="text-[26px] leading-none mb-1.5">{ref.emoji || '🍜'}</span>
-              <span className="font-bold text-[11.5px] leading-tight text-[#2A2118] whitespace-nowrap">
+              <span className="text-[24px] leading-none mb-1.5">{ref.emoji || '🍜'}</span>
+              <span className="font-bold text-[11.5px] leading-tight text-ink whitespace-nowrap">
                 {displayLabel}
               </span>
             </button>
@@ -191,53 +189,49 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
       </div>
 
       {/* Seller Said Card */}
-      <div className="bg-[#FCF9F2] rounded-[20px] p-3.5 border border-[#EBE1CE] mb-3">
-        <div className="text-[14px] text-[#6B5E4E] font-medium">
+      <div className="bg-surface rounded-[20px] p-3.5 border border-line mb-3">
+        <div className="text-[13.5px] text-ink-2 font-medium">
           {lang === 'en' ? 'Seller said for ' : 'Người bán báo giá '}
-          <strong className="text-[#2A2118] font-bold">
+          <strong className="text-ink font-bold">
             {selectedRef.id === 'xoai_cat' && !searchQuery ? 'Xoài' : selectedRef.name_vi}
           </strong>
         </div>
 
         <div className="flex items-baseline gap-2 mt-1">
-          <span className="font-display text-[36px] leading-none text-[#2A2118] tabular-nums">
+          <span className="font-display text-[34px] leading-none text-ink tabular-nums">
             {formatShortVnd(numericVnd)}
           </span>
-          <span className="text-[16px] text-[#6B5E4E] tabular-nums">
+          <span className="text-[15px] text-ink-2 tabular-nums">
             = {formatDotVnd(numericVnd)} ≈ {formatUsd(numericVnd)}
           </span>
         </div>
 
         {/* Unit Picker Pills */}
-        <div className="flex items-center gap-2 mt-2.5 overflow-x-auto">
+        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar">
           {QUICK_UNITS.map((u) => {
             const active = selectedUnit === u;
             return (
-              <button
+              <Chip
                 key={u}
-                type="button"
+                as="button"
+                variant={active ? 'active' : 'default'}
                 onClick={() => setSelectedUnit(u)}
-                className={`px-3.5 py-1 rounded-full text-[13.5px] font-bold transition-colors cursor-pointer ${
-                  active
-                    ? 'bg-[#2A2118] text-white'
-                    : 'bg-[#EFE4CE] text-[#2A2118] hover:bg-[#E4D6B8]'
-                }`}
               >
                 {u}
-              </button>
+              </Chip>
             );
           })}
         </div>
       </div>
 
-      {/* 4x3 Numpad matching Screen 7 */}
-      <div className="grid grid-cols-3 gap-2.5 mb-3.5">
+      {/* 4x3 Numpad */}
+      <div className="grid grid-cols-3 gap-2 mb-3.5">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
           <button
             key={digit}
             type="button"
             onClick={() => handleDigitPress(digit)}
-            className="numpad-key h-[48px] font-display text-[23px] flex items-center justify-center cursor-pointer"
+            className="h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-[20px] flex items-center justify-center hover:bg-surface-2 active:scale-[0.98] transition-all cursor-pointer tabular-nums"
           >
             {digit}
           </button>
@@ -246,7 +240,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
         <button
           type="button"
           onClick={handleKPress}
-          className="h-[48px] rounded-[16px] bg-[#E3A82B] text-[#2A2118] font-display text-[22px] shadow-[0_2px_0_#B9831A] active:translate-y-0.5 flex items-center justify-center cursor-pointer"
+          className="h-[48px] rounded-[14px] bg-surface-2 text-ink font-bold text-[19px] flex items-center justify-center hover:bg-surface-3 active:scale-[0.98] transition-all cursor-pointer"
         >
           k
         </button>
@@ -254,7 +248,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
         <button
           type="button"
           onClick={() => handleDigitPress('0')}
-          className="numpad-key h-[48px] font-display text-[23px] flex items-center justify-center cursor-pointer"
+          className="h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-[20px] flex items-center justify-center hover:bg-surface-2 active:scale-[0.98] transition-all cursor-pointer tabular-nums"
         >
           0
         </button>
@@ -263,24 +257,21 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
           type="button"
           onClick={handleBackspace}
           aria-label="Backspace"
-          className="numpad-key h-[48px] text-[#2A2118] flex items-center justify-center cursor-pointer"
+          className="h-[48px] rounded-[14px] bg-surface border border-line text-ink flex items-center justify-center hover:bg-surface-2 active:scale-[0.98] transition-all cursor-pointer"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-            <line x1="18" y1="9" x2="12" y2="15" />
-            <line x1="12" y1="9" x2="18" y2="15" />
-          </svg>
+          <Delete className="w-5 h-5 text-ink" />
         </button>
       </div>
 
       {/* Primary Action: Check this price */}
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="md"
         onClick={handleSubmit}
-        className="btn-mustard w-full h-[54px] rounded-[18px] font-bold text-[18px] mt-auto cursor-pointer"
+        className="w-full mt-auto"
       >
         {lang === 'en' ? 'Check this price' : 'Kiểm tra mức giá này'}
-      </button>
+      </Button>
     </div>
   );
 };

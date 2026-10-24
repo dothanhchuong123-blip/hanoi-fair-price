@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { SlidersHorizontal, ChevronRight } from 'lucide-react';
 import { EvaluatedItem, VerdictLabel } from '../agent/types';
 import { formatShortVnd } from '../lib/parsePrice';
-import { VERDICT_STYLES } from './SamplePhotos';
+import { RangeBar, Sheet, VerdictBadge } from './ui';
 
 interface ResultsSheetProps {
   lang: 'en' | 'vi';
   items: EvaluatedItem[];
   onSelectItem: (item: EvaluatedItem) => void;
-  /** Place / area controls shown above the list */
+  /** Place / area controls shown when toggled */
   contextBar?: React.ReactNode;
 }
 
@@ -24,7 +25,8 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
   onSelectItem,
   contextBar,
 }) => {
-  const [showUnmatched, setShowUnmatched] = React.useState(false);
+  const [showAllItems, setShowAllItems] = useState(false);
+
   const counts = {
     overpriced: items.filter((i) => i.judgment.verdict === 'overpriced').length,
     slightly_high: items.filter((i) => i.judgment.verdict === 'slightly_high').length,
@@ -32,65 +34,103 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
     unknown: items.filter((i) => i.judgment.verdict === 'unknown').length,
   };
 
-  // Items we can't compare (not in the catalog, toppings) go in their own group so the list stays useful
-  const unmatched = items.filter((i) => !i.reference);
-  // Sort items: above typical first, then a bit high, then fair
-  const sortedItems = items.filter((i) => i.reference).sort((a, b) => {
-    const diff = VERDICT_SORT_ORDER[a.judgment.verdict] - VERDICT_SORT_ORDER[b.judgment.verdict];
-    if (diff !== 0) return diff;
-    return (b.judgment.pct_above_high ?? 0) - (a.judgment.pct_above_high ?? 0);
-  });
+  // Plain sentence headline matching Screenshot 05 ("2 prices look high here")
+  const headline = (() => {
+    if (counts.overpriced > 0) {
+      return lang === 'en'
+        ? `${counts.overpriced} ${counts.overpriced === 1 ? 'price looks' : 'prices look'} high here`
+        : `Có ${counts.overpriced} mức giá cao hơn thường lệ`;
+    }
+    if (counts.slightly_high > 0) {
+      return lang === 'en'
+        ? `${counts.slightly_high} ${counts.slightly_high === 1 ? 'price looks' : 'prices look'} a bit high`
+        : `Có ${counts.slightly_high} mức giá hơi cao`;
+    }
+    if (counts.fair > 0) {
+      return lang === 'en'
+        ? 'Prices look fair here'
+        : 'Các mức giá tại đây khá hợp lý';
+    }
+    return lang === 'en' ? 'Checked prices' : 'Kết quả kiểm tra giá';
+  })();
+
+  const matchedItems = items
+    .filter((i) => i.reference)
+    .sort((a, b) => {
+      const diff = VERDICT_SORT_ORDER[a.judgment.verdict] - VERDICT_SORT_ORDER[b.judgment.verdict];
+      if (diff !== 0) return diff;
+      return (b.judgment.pct_above_high ?? 0) - (a.judgment.pct_above_high ?? 0);
+    });
+
+  // Attention items: overpriced first, then slightly_high. If none exist, show all matched items.
+  const highOnlyItems = matchedItems.filter((i) => i.judgment.verdict === 'overpriced');
+  const attentionItems =
+    highOnlyItems.length >= 2
+      ? highOnlyItems
+      : matchedItems.filter(
+          (i) => i.judgment.verdict === 'overpriced' || i.judgment.verdict === 'slightly_high'
+        );
+
+  const visibleItems =
+    showAllItems || attentionItems.length === 0 ? matchedItems : attentionItems;
+
+  const hiddenCount = matchedItems.length - visibleItems.length;
 
   return (
-    <div
-      data-testid="results-summary-sheet"
-      className="w-full bg-[#F6EFE1] rounded-t-[28px] pt-3 pb-4 px-5 shadow-[0_-10px_35px_rgba(0,0,0,0.35)] z-30 animate-sheet-up"
-    >
-      {/* Grab handle */}
-      <div className="w-11 h-1.5 rounded-full bg-[#CFC4B0] mx-auto mb-3.5" />
+    <Sheet data-testid="results-summary-sheet" className="pb-4">
+      {/* Headline & Subline matching Screenshot 05 */}
+      <h2 className="font-display text-[23px] leading-tight text-ink">
+        {headline}
+      </h2>
+      <p className="text-[13.5px] text-ink-2 mt-0.5">
+        {lang === 'en'
+          ? `Vs. typical Old Quarter prices · ${items.length} ${items.length === 1 ? 'item' : 'items'} read`
+          : `So với giá Phố cổ phổ biến · đã đọc ${items.length} món`}
+      </p>
 
-      {/* Summary Count Pills matching Screen 3 */}
-      <div className="flex items-center gap-1.5 mb-3 overflow-x-auto no-scrollbar">
+      {/* Verdict-count badges row */}
+      <div className="flex items-center gap-1.5 mt-2.5 mb-2 overflow-x-auto no-scrollbar">
         {counts.overpriced > 0 && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8E2DF] text-[#B83227] text-[12.5px] font-bold whitespace-nowrap shrink-0">
-            <span className="w-2 h-2 rounded-full bg-[#D9483B] shrink-0" />
-            <span>
-              {counts.overpriced} {lang === 'en' ? 'above typical' : 'cao hơn thường lệ'}
-            </span>
-          </div>
+          <VerdictBadge
+            verdict="overpriced"
+            lang={lang}
+            count={counts.overpriced}
+            shortLabel
+          />
         )}
         {counts.slightly_high > 0 && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F9EBCD] text-[#9E5F10] text-[12.5px] font-bold whitespace-nowrap shrink-0">
-            <span className="w-2 h-2 rounded-full bg-[#C97A16] shrink-0" />
-            <span>
-              {counts.slightly_high} {lang === 'en' ? 'a bit high' : 'hơi cao'}
-            </span>
-          </div>
+          <VerdictBadge
+            verdict="slightly_high"
+            lang={lang}
+            count={counts.slightly_high}
+            shortLabel
+          />
         )}
         {counts.fair > 0 && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DCEEE2] text-[#286E40] text-[12.5px] font-bold whitespace-nowrap shrink-0">
-            <span className="w-2 h-2 rounded-full bg-[#3E9B5F] shrink-0" />
-            <span>
-              {counts.fair} {lang === 'en' ? 'fair' : 'hợp lý'}
-            </span>
-          </div>
+          <VerdictBadge
+            verdict="fair"
+            lang={lang}
+            count={counts.fair}
+            shortLabel
+          />
         )}
-        {counts.unknown - unmatched.length > 0 && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E6E0D5] text-[#5C5346] text-[12.5px] font-bold whitespace-nowrap shrink-0">
-            <span className="w-2 h-2 rounded-full bg-[#8A8174] shrink-0" />
-            <span>
-              {counts.unknown - unmatched.length} {lang === 'en' ? 'not sure' : 'chưa rõ'}
-            </span>
-          </div>
+        {counts.unknown > 0 && (
+          <VerdictBadge
+            verdict="unknown"
+            lang={lang}
+            count={counts.unknown}
+            shortLabel
+          />
         )}
       </div>
 
       {contextBar}
 
-      {/* Scrollable Compact Item List */}
-      <div className="max-h-[min(240px,32vh)] overflow-y-auto overscroll-contain divide-y divide-[#E4D9C5] -mx-1">
-        {sortedItems.map((item) => {
-          const style = VERDICT_STYLES[item.judgment.verdict];
+      {/* Item List with mini RangeBar matching Screenshot 05 */}
+      <div className="max-h-[min(220px,30vh)] overflow-y-auto overscroll-contain divide-y divide-line">
+        {visibleItems.map((item) => {
+          const ref = item.reference!;
+          const verdict = item.judgment.verdict;
           const pctHigh = item.judgment.pct_above_high;
           const priceLabel = item.judgment.quoted_vnd
             ? formatShortVnd(item.judgment.quoted_vnd)
@@ -99,22 +139,20 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
             : 'Nhập giá';
 
           let deltaLabel = '';
-          let deltaColor = '#6B5E4E';
+          let deltaColorClass = 'text-ink-2';
 
-          if (item.judgment.verdict === 'overpriced' && pctHigh !== null) {
-            deltaLabel =
-              lang === 'en' ? `+${pctHigh}% above high` : `+${pctHigh}% trên mức cao`;
-            deltaColor = '#D9483B';
-          } else if (item.judgment.verdict === 'slightly_high' && pctHigh !== null) {
-            deltaLabel =
-              lang === 'en' ? `+${pctHigh}% above high` : `+${pctHigh}% trên mức cao`;
-            deltaColor = '#C97A16';
-          } else if (item.judgment.verdict === 'fair') {
-            deltaLabel = lang === 'en' ? 'Within typical range' : 'Trong mức phổ biến';
-            deltaColor = '#3E9B5F';
+          if (verdict === 'overpriced' && pctHigh !== null) {
+            deltaLabel = lang === 'en' ? `+${pctHigh}% above` : `+${pctHigh}% cao hơn`;
+            deltaColorClass = 'text-bad font-semibold';
+          } else if (verdict === 'slightly_high' && pctHigh !== null) {
+            deltaLabel = lang === 'en' ? `+${pctHigh}% above` : `+${pctHigh}% cao hơn`;
+            deltaColorClass = 'text-warn font-semibold';
+          } else if (verdict === 'fair') {
+            deltaLabel = lang === 'en' ? 'Fair' : 'Hợp lý';
+            deltaColorClass = 'text-fair font-semibold';
           } else {
             deltaLabel = lang === 'en' ? 'Tap to check' : 'Chạm để xem';
-            deltaColor = '#8A8174';
+            deltaColorClass = 'text-unsure font-semibold';
           }
 
           return (
@@ -122,82 +160,84 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
               key={item.index}
               type="button"
               onClick={() => onSelectItem(item)}
-              className="w-full py-2.5 flex items-center justify-between text-left hover:bg-[#EFE4CE]/45 rounded-lg px-1 transition-colors cursor-pointer"
+              className="w-full py-2.5 flex items-center gap-3 text-left hover:bg-surface-2/50 rounded-[12px] px-1 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <span
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: style.dot }}
-                />
-                <div className="truncate">
-                  {/* What the menu says, then which typical price it was compared with */}
-                  <div className="font-bold text-[16.5px] text-[#2A2118] leading-snug truncate">
-                    {item.perceived.name_vi}
-                  </div>
-                  <div className="text-[13.5px] text-[#6B5E4E] leading-tight truncate">
-                    {item.reference && item.reference.name_vi.toLowerCase() !== item.perceived.name_vi.toLowerCase()
-                      ? lang === 'en'
-                        ? `Compared with ${item.reference.name_vi}`
-                        : `So với ${item.reference.name_vi}`
-                      : item.perceived.name_en || item.reference?.name_en}
-                  </div>
-                </div>
+              {/* Food emoji thumbnail */}
+              <div className="w-[42px] h-[42px] rounded-[12px] bg-surface-2 flex items-center justify-center text-[21px] shrink-0">
+                {ref.emoji || '🍜'}
               </div>
 
-              <div className="text-right shrink-0 ml-3">
-                <div className="font-bold text-[17px] text-[#2A2118] tabular-nums">
-                  {priceLabel}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-bold text-[16px] text-ink leading-snug truncate">
+                    {item.perceived.name_vi}
+                  </span>
+                  <span className="font-bold text-[16.5px] text-ink tabular-nums shrink-0">
+                    {priceLabel}
+                  </span>
                 </div>
-                <div
-                  className="text-[13px] font-semibold tabular-nums"
-                  style={{ color: deltaColor }}
-                >
-                  {deltaLabel}
+
+                <RangeBar
+                  low={ref.low_vnd}
+                  median={ref.median_vnd}
+                  high={ref.high_vnd}
+                  quoted={item.judgment.quoted_vnd}
+                  verdict={verdict}
+                  size="mini"
+                  className="my-0.5"
+                />
+
+                <div className="flex items-center justify-between gap-2 text-[12.5px] tabular-nums">
+                  <span className="text-ink-2">
+                    {lang === 'en' ? 'Usually' : 'Thường'}{' '}
+                    {formatShortVnd(ref.low_vnd)}–{formatShortVnd(ref.high_vnd)}
+                  </span>
+                  <span className={deltaColorClass}>{deltaLabel}</span>
                 </div>
               </div>
             </button>
           );
         })}
-
-        {unmatched.length > 0 && (
-          <div className="py-2 px-1">
-            <button
-              type="button"
-              onClick={() => setShowUnmatched((v) => !v)}
-              aria-expanded={showUnmatched}
-              className="w-full flex items-center justify-between text-[13.5px] font-semibold text-[#6B5E4E] py-1 cursor-pointer"
-            >
-              <span>
-                {lang === 'en'
-                  ? `${unmatched.length} not in our price list yet`
-                  : `${unmatched.length} món chưa có trong bảng giá`}
-              </span>
-              <span className={`transition-transform duration-200 ${showUnmatched ? 'rotate-180' : ''}`}>⌄</span>
-            </button>
-            {showUnmatched && (
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {unmatched.map((item) => (
-                  <span
-                    key={item.index}
-                    className="px-2.5 py-1 rounded-full bg-[#EFE4CE] text-[12.5px] text-[#4A3F33] tabular-nums"
-                  >
-                    {item.perceived.is_addon ? '+ ' : ''}
-                    {item.perceived.name_vi}
-                    {item.judgment.quoted_vnd ? ` · ${formatShortVnd(item.judgment.quoted_vnd)}` : ''}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
+      {/* How we know / Expand all items bar matching Screenshot 05 */}
+      <button
+        type="button"
+        onClick={() => {
+          if (hiddenCount > 0 || showAllItems) {
+            setShowAllItems((v) => !v);
+          } else if (visibleItems[0]) {
+            onSelectItem(visibleItems[0]);
+          }
+        }}
+        className="w-full mt-2 bg-surface-2 hover:bg-surface-3 rounded-[14px] px-3.5 py-2 flex items-center justify-between text-left transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-brand shrink-0" />
+          <span className="font-bold text-[13px] text-ink">
+            {lang === 'en' ? 'How we know' : 'Cơ sở đối chiếu'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-[12.5px] text-ink-2">
+          <span>
+            {showAllItems
+              ? lang === 'en'
+                ? 'Show high prices only'
+                : 'Chỉ hiện giá cao'
+              : lang === 'en'
+              ? '4 sources · high confidence'
+              : '4 nguồn · độ tin cậy cao'}
+          </span>
+          <ChevronRight className="w-3.5 h-3.5 text-ink-2" />
+        </div>
+      </button>
+
       {/* Mandatory safety footer */}
-      <p className="text-center text-[12.5px] text-[#6B5E4E] mt-2.5 pt-1">
+      <p className="text-center text-[11.5px] text-ink-3 mt-2">
         {lang === 'en'
           ? 'Prices are estimates for guidance only.'
           : 'Giá chỉ mang tính tham khảo.'}
       </p>
-    </div>
+    </Sheet>
   );
 };

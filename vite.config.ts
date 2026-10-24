@@ -9,6 +9,9 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        fs: path.resolve(__dirname, 'src/lib/emptyModule.ts'),
+        path: path.resolve(__dirname, 'src/lib/emptyModule.ts'),
+        crypto: path.resolve(__dirname, 'src/lib/emptyModule.ts'),
       },
     },
     server: {
