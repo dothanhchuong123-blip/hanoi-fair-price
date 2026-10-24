@@ -267,8 +267,14 @@ export default function App() {
       }
       console.error('Price check failed', err);
       setScreen('camera_home');
+      // A missing server key fails every photo, so say so instead of blaming the network
+      const keyMissing = err instanceof Error && err.message.includes('GEMINI_API_KEY');
       setScanError(
-        lang === 'en'
+        keyMissing
+          ? lang === 'en'
+            ? 'Photo checks are switched off on this server (no Gemini key). Use the sample for now.'
+            : 'Máy chủ chưa bật kiểm tra ảnh (thiếu khóa Gemini). Hãy dùng ảnh mẫu.'
+          : lang === 'en'
           ? "Couldn't reach our checker. Try again or use the sample."
           : 'Không kết nối được bộ kiểm tra giá. Hãy thử lại hoặc dùng ảnh mẫu.'
       );
@@ -770,6 +776,19 @@ export default function App() {
                     >
                       {lang === 'en' ? 'Try again' : 'Thử lại'}
                     </Button>
+                    {uploadedImage && !demoMode && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        data-testid="error-retake-btn"
+                        onClick={() => {
+                          setUploadedImage(null);
+                          setScanError(null);
+                        }}
+                      >
+                        {lang === 'en' ? 'Retake' : 'Chụp lại'}
+                      </Button>
+                    )}
                     <Button
                       variant="brand"
                       size="sm"
