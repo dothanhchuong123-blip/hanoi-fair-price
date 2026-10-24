@@ -156,11 +156,14 @@ export function buildTemplateResponse(
     return {
       explanation_en,
       explanation_vi,
-      phrase_header_en: 'POLITE BARGAINING',
-      phrase_header_vi: 'MẶC CẢ LỊCH SỰ',
+      phrase_header_en: 'SAY THIS, POLITELY',
+      phrase_header_vi: 'NÓI LỊCH SỰ NHƯ SAU',
       phrase_vi: `Bớt cho em ${discountK} nghìn được không ạ?`,
-      pronunciation: `buht chaw em · ${discountK} ngeen · dwerk khong ah?`,
-      phrase_en: `“Could you take ${discountK},000đ off for me, please?”`,
+      pronunciation:
+        discountK === 20
+          ? 'bút cho em hai mươi nghìn được không ạ'
+          : `buht chaw em · ${discountK} ngeen · dwerk khong ah?`,
+      phrase_en: `“Could you take ${discountK} thousand off, please?”`,
       tip_en:
         'At fruit stalls and street baskets, friendly bargaining is normal. Smile and ask lightly before buying.',
       tip_vi:
@@ -180,15 +183,15 @@ export function buildTemplateResponse(
     };
   }
 
-  // Street food / drinks (fixed prices: ask politely before ordering, matching Screen 5)
+  // Street food / drinks when above typical (matching Screenshot 06)
   return {
     explanation_en,
     explanation_vi,
-    phrase_header_en: 'ASK THE PRICE',
-    phrase_header_vi: 'HỎI GIÁ TRƯỚC KHI GỌI',
-    phrase_vi: `${nameVi} bao nhiêu ${pronInfo.unitVi} ạ?`,
-    pronunciation: pronInfo.pron,
-    phrase_en: `“How much is ${pronInfo.unitEn}?”`,
+    phrase_header_en: 'SAY THIS, POLITELY',
+    phrase_header_vi: 'NÓI LỊCH SỰ NHƯ SAU',
+    phrase_vi: 'Bớt cho em 20 nghìn được không ạ?',
+    pronunciation: 'bút cho em hai mươi nghìn được không ạ',
+    phrase_en: '“Could you take 20 thousand off, please?”',
     tip_en:
       'Street food usually has fixed prices. Asking before you order is normal and polite — haggling isn’t.',
     tip_vi:
@@ -196,8 +199,8 @@ export function buildTemplateResponse(
     more_phrases: [
       {
         icon: '📋',
-        vi: 'Có thực đơn ghi giá không ạ?',
-        en: 'Do you have a menu with prices?',
+        vi: `${nameVi} bao nhiêu ${pronInfo.unitVi} ạ?`,
+        en: `How much is ${pronInfo.unitEn}?`,
       },
       {
         icon: '🙏',

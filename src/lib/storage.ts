@@ -47,14 +47,42 @@ const OLD_QUARTER_STREETS: Array<{ id: string; street: string; emoji: string }> 
   { id: 'hang_dao', street: 'Hàng Đào', emoji: '🍢' },
 ];
 
+const DEFAULT_CROWD_REPORTS: CrowdReport[] = [
+  { id: 'seed_rep_1', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 50000, street: 'Hàng Mành', timestamp: 1760000001000 },
+  { id: 'seed_rep_2', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 50000, street: 'Hàng Quạt', timestamp: 1760000002000 },
+  { id: 'seed_rep_3', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 55000, street: 'Hàng Bạc', timestamp: 1760000003000 },
+  { id: 'seed_rep_4', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 55000, street: 'Hàng Đào', timestamp: 1760000004000 },
+  { id: 'seed_rep_5', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 60000, street: 'Hàng Than', timestamp: 1760000005000 },
+  { id: 'seed_rep_6', item_id: 'bun_cha', name_vi: 'Bún chả', paid_vnd: 60000, street: 'Cầu Gỗ', timestamp: 1760000006000 },
+];
+
 export function getCrowdReports(): CrowdReport[] {
   try {
+    if (typeof localStorage === 'undefined') return DEFAULT_CROWD_REPORTS;
     const raw = localStorage.getItem(REPORTS_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      localStorage.setItem(REPORTS_KEY, JSON.stringify(DEFAULT_CROWD_REPORTS));
+      return DEFAULT_CROWD_REPORTS;
+    }
     return JSON.parse(raw) as CrowdReport[];
   } catch {
-    return [];
+    return DEFAULT_CROWD_REPORTS;
   }
+}
+
+export function getCrowdStatsForItem(
+  itemId: string | null | undefined
+): { count: number; median_vnd: number } | null {
+  if (!itemId) return null;
+  const reports = getCrowdReports().filter((r) => r.item_id === itemId && r.paid_vnd > 0);
+  if (reports.length === 0) return null;
+  const sorted = reports.map((r) => r.paid_vnd).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 1
+      ? sorted[mid]
+      : Math.round((sorted[mid - 1] + sorted[mid]) / 2 / 1000) * 1000;
+  return { count: reports.length, median_vnd: median };
 }
 
 export function getPassportStamps(): PassportStamp[] {

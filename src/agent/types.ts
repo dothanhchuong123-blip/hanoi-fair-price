@@ -2,6 +2,29 @@ export type ImageType = 'menu' | 'price_board' | 'stall' | 'not_relevant';
 
 export type ItemCategory = 'street_food' | 'drink' | 'fruit' | 'vegetable' | 'other';
 
+export type BoxSource = 'ocr' | 'ocr_partial' | 'gemini';
+
+export interface TraceStep {
+  id:
+    | 'ocr'
+    | 'read'
+    | 'fuse'
+    | 'tiles'
+    | 'second_pass'
+    | 'match'
+    | 'lookup'
+    | 'maps'
+    | 'judge'
+    | 'respond'
+    | 'live_track';
+  title_en: string;
+  title_vi: string;
+  detail: string;          // technical sub-line, e.g. "Cloud Vision · 214 words"
+  model?: string;          // exact model id or API name
+  ms: number;
+  status: 'done' | 'skipped' | 'failed';
+}
+
 export interface PerceivedItem {
   name_vi: string;
   name_en: string;
@@ -11,6 +34,9 @@ export interface PerceivedItem {
   unit: string;
   /** [ymin, xmin, ymax, xmax] normalized 0-1000 */
   box_2d: [number, number, number, number];
+  /** Optional polygon of [x, y] points 0-1000 tracing a stall pile outline, or base64 PNG mask */
+  mask?: [number, number][] | string;
+  box_source?: BoxSource;
   confidence: number;
   /** Catalog id Gemini picked for this item, '' when nothing in the catalog fits */
   catalog_id?: string;
@@ -20,15 +46,66 @@ export interface PerceivedItem {
   alternatives?: string[];
   /** Topping / add-on line (e.g. "Nấm 5k" under "Ăn kèm"), never judged as a full dish */
   is_addon?: boolean;
+  /** True when the second pass changed this item */
+  rechecked?: boolean;
+  /** Optional Google Search grounding range and link for this item */
+  search_grounding?: {
+    count: number;
+    low_vnd: number;
+    high_vnd: number;
+    uri: string;
+  };
 }
 
 export type VenueType = 'street' | 'eatery' | 'cafe' | 'tourist';
+
+export type MapsAreaKind = 'tourist_core' | 'mixed' | 'local';
+
+export interface MapsSource {
+  title: string;
+  uri: string;
+}
+
+export interface MapsContextResult {
+  unavailable?: boolean;
+  area_kind?: MapsAreaKind;
+  area_name?: string;
+  summary_en?: string;
+  summary_vi?: string;
+  sources?: MapsSource[];
+}
+
+export interface NearbyPlace {
+  name: string;
+  rating: number | null;
+  price_low: number | null;
+  price_high: number | null;
+  open_now?: boolean | null;
+  uri: string;
+  place_id: string;
+  distance_m?: number;
+  lat?: number;
+  lng?: number;
+  is_sample?: boolean;
+}
+
+export interface MapsNearbyResult {
+  unavailable?: boolean;
+  places?: NearbyPlace[];
+  sources?: MapsSource[];
+  is_sample?: boolean;
+  maps_js_api_key?: string;
+}
 
 export interface PerceptionResult {
   image_type: ImageType;
   items: PerceivedItem[];
   /** Gemini's read of the kind of place, from cues like plastic stools, printed menus, English text */
   venue_type?: VenueType;
+  trace?: TraceStep[];
+  image_size?: { w: number; h: number };
+  /** Optional neighbourhood context retrieved in parallel via /api/maps/context */
+  maps_context?: MapsContextResult;
 }
 
 export type AreaType = 'old_quarter' | 'elsewhere';
@@ -38,6 +115,10 @@ export interface PriceContext {
   area: AreaType;
   venue: VenueType;
   date: Date;
+  /** Optional neighbourhood classification from Google Maps grounding */
+  area_kind?: MapsAreaKind;
+  /** Optional neighbourhood name from Google Maps grounding (e.g. "Hoàn Kiếm") */
+  area_name?: string;
 }
 
 /** One reason the typical range was moved, shown to the user as a chip */
@@ -164,6 +245,7 @@ export interface PipelineProgressEvent {
   steps: PipelineStepProgress[];
   itemCount?: number;
   perceivedItems?: PerceivedItem[];
+  trace?: TraceStep[];
 }
 
 export interface CrowdReport {

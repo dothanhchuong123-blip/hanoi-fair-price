@@ -1,0 +1,514 @@
+import React, { useEffect, useState } from 'react';
+import {
+  APIProvider,
+  AdvancedMarker,
+  Map,
+  useMapsLibrary,
+} from '@vis.gl/react-google-maps';
+import { ChevronLeft, ExternalLink, MapPin } from 'lucide-react';
+import { OLD_QUARTER_CENTER, haversineMeters } from '../agent/context';
+import { fetchMapsNearby } from '../agent/maps';
+import { EvaluatedItem, MapsNearbyResult, NearbyPlace } from '../agent/types';
+import { formatShortVnd } from '../lib/parsePrice';
+import { Button, Chip, IconButton, Sheet } from './ui';
+
+interface NearbySheetProps {
+  lang: 'en' | 'vi';
+  item: EvaluatedItem;
+  demoMode: boolean;
+  locationAllowed: boolean;
+  userCoords: { lat: number; lng: number } | null;
+  areaName?: string;
+  onClose: () => void;
+  onRequestLocation: () => Promise<void>;
+}
+
+interface PlaceLocationMap {
+  [placeId: string]: {
+    lat: number;
+    lng: number;
+    distance_m: number;
+  };
+}
+
+function formatPriceRange(low: number | null, high: number | null): string {
+  if (low !== null && high !== null) {
+    if (low === high) return formatShortVnd(high);
+    const lowStr = formatShortVnd(low).replace(/k$/i, '');
+    const highStr = formatShortVnd(high);
+    return `${lowStr}–${highStr}`;
+  }
+  if (high !== null) return formatShortVnd(high);
+  if (low !== null) return formatShortVnd(low);
+  return '—';
+}
+
+function formatDistanceMeters(meters?: number): string | null {
+  if (typeof meters !== 'number' || !Number.isFinite(meters)) return null;
+  if (meters < 1000) return `${Math.round(meters / 10) * 10} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+/**
+ * Child component inside <APIProvider> that uses Places API (New) Place Details
+ * by place_id with field mask ['location'] and computes haversine distance from user.
+ */
+const PlacesLocationResolver: React.FC<{
+  places: NearbyPlace[];
+  userCoords: { lat: number; lng: number };
+  onResolved: (locations: PlaceLocationMap) => void;
+}> = ({ places, userCoords, onResolved }) => {
+  const placesLib = useMapsLibrary('places');
+
+  useEffect(() => {
+    if (!placesLib || places.length === 0) return;
+    let cancelled = false;
+
+    const resolveAll = async () => {
+      const next: PlaceLocationMap = {};
+      await Promise.all(
+        places.map(async (p) => {
+          if (!p.place_id || p.place_id.startsWith('sample_')) return;
+          try {
+            const PlaceCtor = (placesLib as any).Place;
+            if (!PlaceCtor) return;
+            const placeInstance = new PlaceCtor({ id: p.place_id });
+            await placeInstance.fetchFields({ fields: ['location'] });
+            const loc = placeInstance.location;
+            if (!loc) return;
+            const lat = typeof loc.lat === 'function' ? loc.lat() : Number(loc.lat);
+            const lng = typeof loc.lng === 'function' ? loc.lng() : Number(loc.lng);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              next[p.place_id] = {
+                lat,
+                lng,
+                distance_m: haversineMeters(userCoords, { lat, lng }),
+              };
+            }
+          } catch {
+            // Ignore individual place lookup failures
+          }
+        })
+      );
+      if (!cancelled && Object.keys(next).length > 0) {
+        onResolved(next);
+      }
+    };
+
+    resolveAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [placesLib, places, userCoords, onResolved]);
+
+  return null;
+};
+
+export const NearbySheet: React.FC<NearbySheetProps> = ({
+  lang,
+  item,
+  demoMode,
+  locationAllowed,
+  userCoords,
+  areaName,
+  onClose,
+  onRequestLocation,
+}) => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<MapsNearbyResult | null>(null);
+  const [resolvedLocations, setResolvedLocations] = useState<PlaceLocationMap>({});
+
+  const ref = item.reference;
+  const dishVi = ref?.name_vi || item.perceived.name_vi;
+  const dishEn = ref?.name_en || item.perceived.name_en;
+  const itemKey = ref?.id || dishVi.toLowerCase();
+  const typicalHigh = ref?.high_vnd ?? null;
+
+  const effectiveCoords = userCoords ?? OLD_QUARTER_CENTER;
+
+  useEffect(() => {
+    if (!locationAllowed && !demoMode) {
+      setResult(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    fetchMapsNearby({
+      lat: effectiveCoords.lat,
+      lng: effectiveCoords.lng,
+      itemId: itemKey,
+      dishVi,
+      dishEn,
+      demoMode,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setResult(res);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResult({ unavailable: true, places: [], sources: [] });
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationAllowed, demoMode, effectiveCoords.lat, effectiveCoords.lng, itemKey, dishVi, dishEn]);
+
+  const envMapsKey = (
+    (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
+    result?.maps_js_api_key ||
+    ''
+  ).trim();
+  const hasGoogleMapsKey = Boolean(envMapsKey);
+  const placesList = result?.places ?? [];
+
+  const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    `${dishVi} (${dishEn}) near Hoàn Kiếm Hanoi`
+  )}`;
+
+  return (
+    <div
+      data-testid="nearby-sheet-view"
+      className="absolute inset-0 z-30 flex flex-col justify-between bg-black/45 backdrop-blur-[2px]"
+    >
+      {/* Top header + optional Google Map (ONLY rendered when GOOGLE_MAPS_API_KEY exists) */}
+      <div className="relative flex-1 min-h-[140px] flex flex-col justify-between">
+        {hasGoogleMapsKey && (locationAllowed || demoMode) && (
+          <div className="absolute inset-0 z-0" data-testid="nearby-google-map">
+            <APIProvider apiKey={envMapsKey}>
+              <PlacesLocationResolver
+                places={placesList}
+                userCoords={effectiveCoords}
+                onResolved={(locs) =>
+                  setResolvedLocations((prev) => ({ ...prev, ...locs }))
+                }
+              />
+              <Map
+                defaultCenter={effectiveCoords}
+                defaultZoom={15}
+                mapId="DEMO_MAP_ID"
+                internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+                gestureHandling="greedy"
+                disableDefaultUI
+                className="w-full h-full"
+              >
+                {/* User pin ("You") */}
+                <AdvancedMarker position={effectiveCoords}>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded-full bg-[#2563EB] border-2 border-white shadow-md" />
+                    <span className="mt-1 px-2 py-0.5 rounded-full bg-[#2563EB] text-white text-[11px] font-bold shadow">
+                      {lang === 'en' ? 'You' : 'Bạn'}
+                    </span>
+                  </div>
+                </AdvancedMarker>
+
+                {/* Place pins showing their price */}
+                {placesList.map((place) => {
+                  const resolved = resolvedLocations[place.place_id];
+                  const lat = resolved?.lat ?? place.lat;
+                  const lng = resolved?.lng ?? place.lng;
+                  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+                  const priceLabel = formatPriceRange(place.price_low, place.price_high);
+                  return (
+                    <AdvancedMarker key={place.place_id} position={{ lat, lng }}>
+                      <div className="px-2.5 py-1 rounded-full bg-fair text-white font-mono font-bold text-[12px] shadow-md border border-white/80 whitespace-nowrap">
+                        {priceLabel}
+                      </div>
+                    </AdvancedMarker>
+                  );
+                })}
+              </Map>
+            </APIProvider>
+          </div>
+        )}
+
+        {/* Floating top navigation bar */}
+        <header className="relative z-10 px-4 pt-3.5 pb-2 flex items-center justify-between gap-2">
+          <IconButton
+            variant="glass"
+            onClick={onClose}
+            aria-label={lang === 'en' ? 'Back to verdict' : 'Quay lại kết quả'}
+            data-testid="nearby-back-btn"
+          >
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </IconButton>
+
+          <Chip variant="glass" data-testid="nearby-area-chip">
+            <MapPin className="w-3.5 h-3.5 text-white/90" />
+            <span>
+              {areaName
+                ? `${lang === 'en' ? 'Near' : 'Gần'} ${areaName}`
+                : lang === 'en'
+                ? 'Near Hàng Bạc'
+                : 'Gần Hàng Bạc'}
+            </span>
+          </Chip>
+
+          <div className="w-[44px]" aria-hidden="true" />
+        </header>
+      </div>
+
+      {/* Bottom List Sheet matching Screenshot 08 */}
+      <Sheet
+        variant="bg"
+        aria-label={
+          lang === 'en' ? `Cheaper ${dishVi} nearby` : `${dishVi} giá hợp lý gần đây`
+        }
+        className="max-h-[78vh] overflow-y-auto"
+      >
+        {/* Sheet Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-[22px] leading-tight text-ink">
+              {lang === 'en'
+                ? `Cheaper ${dishVi} nearby`
+                : `${dishVi} giá tốt gần đây`}
+            </h2>
+            <p className="text-[13px] text-ink-2 mt-1 flex flex-wrap items-center gap-1.5">
+              {lang === 'en' ? (
+                <span>
+                  From <span translate="no">Google Maps</span> · prices from reviews &amp; reports
+                </span>
+              ) : (
+                <span>
+                  Từ <span translate="no">Google Maps</span> · giá từ đánh giá &amp; cộng đồng
+                </span>
+              )}
+              {result?.is_sample && (
+                <span
+                  data-testid="nearby-sample-badge"
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-warn-soft text-warn border border-warn/25"
+                >
+                  {lang === 'en' ? 'sample data' : 'dữ liệu mẫu'}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* STATE 1: No Location */}
+        {!locationAllowed && !demoMode && (
+          <div
+            data-testid="nearby-no-location"
+            className="mt-4 p-5 rounded-[18px] bg-surface border border-line text-center"
+          >
+            <p className="text-[14.5px] font-semibold text-ink">
+              {lang === 'en'
+                ? 'Allow location to see nearby places.'
+                : 'Cho phép vị trí để xem quán gần đây.'}
+            </p>
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="primary"
+                onClick={onRequestLocation}
+                data-testid="nearby-allow-location-btn"
+              >
+                <MapPin className="w-4 h-4" />
+                <span>{lang === 'en' ? 'Allow location' : 'Cho phép vị trí'}</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STATE 2: Loading (3 skeleton rows while /nearby runs) */}
+        {(locationAllowed || demoMode) && loading && (
+          <div data-testid="nearby-loading" className="mt-4 space-y-2.5">
+            {[0, 1, 2].map((idx) => (
+              <div
+                key={idx}
+                className="p-3.5 rounded-[18px] bg-surface border border-line flex items-center justify-between gap-3 animate-pulse"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 rounded-[14px] bg-surface-2 shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 w-36 bg-surface-2 rounded" />
+                    <div className="h-3 w-24 bg-surface-2 rounded" />
+                  </div>
+                </div>
+                <div className="w-16 h-8 bg-surface-2 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* STATE 3: Unavailable ({ unavailable: true }) */}
+        {(locationAllowed || demoMode) && !loading && result?.unavailable && (
+          <div
+            data-testid="nearby-unavailable"
+            className="mt-4 p-5 rounded-[18px] bg-surface border border-line text-center"
+          >
+            <p className="text-[14.5px] font-semibold text-ink">
+              {lang === 'en'
+                ? "Couldn't load nearby places right now"
+                : 'Hiện chưa tải được các quán gần đây'}
+            </p>
+            <a
+              href={mapsSearchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="nearby-fallback-search-link"
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] bg-brand text-white text-[13.5px] font-semibold hover:bg-brand/90 transition-colors"
+            >
+              <span>
+                {lang === 'en' ? (
+                  <>
+                    Search on <span translate="no">Google Maps</span>
+                  </>
+                ) : (
+                  <>
+                    Tìm trên <span translate="no">Google Maps</span>
+                  </>
+                )}
+              </span>
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+        )}
+
+        {/* STATE 4: Places List */}
+        {(locationAllowed || demoMode) &&
+          !loading &&
+          result &&
+          !result.unavailable &&
+          placesList.length > 0 && (
+            <div className="mt-3.5">
+              <div data-testid="nearby-places-list" className="space-y-2.5">
+                {placesList.map((place) => {
+                  const resolvedDist = resolvedLocations[place.place_id]?.distance_m;
+                  const distLabel = formatDistanceMeters(resolvedDist ?? place.distance_m);
+                  const comparePrice = place.price_high ?? place.price_low;
+                  const isTypical =
+                    comparePrice !== null &&
+                    typicalHigh !== null &&
+                    comparePrice <= typicalHigh;
+                  const priceStr = formatPriceRange(place.price_low, place.price_high);
+
+                  return (
+                    <a
+                      key={place.place_id}
+                      href={place.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="nearby-place-row"
+                      className="p-3.5 rounded-[18px] bg-surface hover:bg-surface-2/70 border border-line flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Food thumbnail */}
+                        <div
+                          aria-hidden="true"
+                          className="w-12 h-12 rounded-[14px] bg-[#E8DFD2] border border-line flex items-center justify-center text-[22px] shrink-0"
+                        >
+                          {ref?.emoji || '🍜'}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="font-bold text-[15.5px] text-ink leading-snug truncate flex items-center gap-1.5">
+                            <span className="truncate">{place.name}</span>
+                            {place.is_sample && (
+                              <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 shrink-0">
+                                {lang === 'en' ? 'sample data' : 'dữ liệu mẫu'}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[13px] text-ink-2 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {distLabel && (
+                              <>
+                                <span>{distLabel}</span>
+                                <span aria-hidden="true">·</span>
+                              </>
+                            )}
+                            {place.rating !== null && (
+                              <span>★ {place.rating.toFixed(1)}</span>
+                            )}
+                            {place.open_now !== null && place.open_now !== undefined && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span
+                                  className={
+                                    place.open_now
+                                      ? 'text-fair font-semibold'
+                                      : 'text-ink-3'
+                                  }
+                                >
+                                  {place.open_now
+                                    ? lang === 'en'
+                                      ? 'open'
+                                      : 'đang mở'
+                                    : lang === 'en'
+                                    ? 'closed'
+                                    : 'đã đóng'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right side: price range & typical badge */}
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                        <div className="font-mono font-bold text-[16px] text-ink tabular-nums">
+                          {priceStr}
+                        </div>
+                        {isTypical && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-fair-soft text-fair">
+                            {lang === 'en' ? 'typical' : 'phổ biến'}
+                          </span>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+
+              {/* Attribution rule: sources sit directly under the list they support */}
+              {result.sources && result.sources.length > 0 && (
+                <div
+                  data-testid="nearby-maps-sources"
+                  className="mt-2.5 pt-2 border-t border-line/60 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-ink-3"
+                >
+                  <span className="font-semibold text-ink-2">
+                    <span translate="no">Google Maps</span>{' '}
+                    {lang === 'en' ? 'sources:' : 'nguồn:'}
+                  </span>
+                  {result.sources.map((src, i) => (
+                    <a
+                      key={`${src.uri}-${i}`}
+                      href={src.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-ink transition-colors truncate max-w-[180px]"
+                    >
+                      {src.title}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        {/* Disclaimer at the bottom */}
+        <p
+          data-testid="nearby-disclaimer"
+          className="text-[12px] text-ink-3 text-center mt-4 pt-2 border-t border-line"
+        >
+          {lang === 'en' ? (
+            <>
+              Places and ratings from <span translate="no">Google Maps</span>. Prices are estimates.
+            </>
+          ) : (
+            <>
+              Địa điểm và đánh giá từ <span translate="no">Google Maps</span>. Giá chỉ là ước tính.
+            </>
+          )}
+        </p>
+      </Sheet>
+    </div>
+  );
+};

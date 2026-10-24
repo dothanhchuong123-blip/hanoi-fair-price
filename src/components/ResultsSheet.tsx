@@ -8,6 +8,7 @@ interface ResultsSheetProps {
   lang: 'en' | 'vi';
   items: EvaluatedItem[];
   onSelectItem: (item: EvaluatedItem) => void;
+  onOpenHowWeKnow?: (item: EvaluatedItem) => void;
   /** Place / area controls shown when toggled */
   contextBar?: React.ReactNode;
 }
@@ -23,6 +24,7 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
   lang,
   items,
   onSelectItem,
+  onOpenHowWeKnow,
   contextBar,
 }) => {
   const [showAllItems, setShowAllItems] = useState(false);
@@ -59,7 +61,10 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
     .sort((a, b) => {
       const diff = VERDICT_SORT_ORDER[a.judgment.verdict] - VERDICT_SORT_ORDER[b.judgment.verdict];
       if (diff !== 0) return diff;
-      return (b.judgment.pct_above_high ?? 0) - (a.judgment.pct_above_high ?? 0);
+      if (a.judgment.verdict === 'fair') return a.index - b.index;
+      const pctDiff = (b.judgment.pct_above_high ?? 0) - (a.judgment.pct_above_high ?? 0);
+      if (pctDiff !== 0) return pctDiff;
+      return a.index - b.index;
     });
 
   // Attention items: overpriced first, then slightly_high. If none exist, show all matched items.
@@ -75,6 +80,7 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
     showAllItems || attentionItems.length === 0 ? matchedItems : attentionItems;
 
   const hiddenCount = matchedItems.length - visibleItems.length;
+  const topFlaggedItem = attentionItems[0] ?? matchedItems[0] ?? items[0];
 
   return (
     <Sheet data-testid="results-summary-sheet" className="pb-4">
@@ -89,38 +95,56 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
       </p>
 
       {/* Verdict-count badges row */}
-      <div className="flex items-center gap-1.5 mt-2.5 mb-2 overflow-x-auto no-scrollbar">
-        {counts.overpriced > 0 && (
-          <VerdictBadge
-            verdict="overpriced"
-            lang={lang}
-            count={counts.overpriced}
-            shortLabel
-          />
-        )}
-        {counts.slightly_high > 0 && (
-          <VerdictBadge
-            verdict="slightly_high"
-            lang={lang}
-            count={counts.slightly_high}
-            shortLabel
-          />
-        )}
-        {counts.fair > 0 && (
-          <VerdictBadge
-            verdict="fair"
-            lang={lang}
-            count={counts.fair}
-            shortLabel
-          />
-        )}
-        {counts.unknown > 0 && (
-          <VerdictBadge
-            verdict="unknown"
-            lang={lang}
-            count={counts.unknown}
-            shortLabel
-          />
+      <div className="flex items-center justify-between gap-1.5 mt-2.5 mb-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5">
+          {counts.overpriced > 0 && (
+            <VerdictBadge
+              verdict="overpriced"
+              lang={lang}
+              count={counts.overpriced}
+              shortLabel
+            />
+          )}
+          {counts.slightly_high > 0 && (
+            <VerdictBadge
+              verdict="slightly_high"
+              lang={lang}
+              count={counts.slightly_high}
+              shortLabel
+            />
+          )}
+          {counts.fair > 0 && (
+            <VerdictBadge
+              verdict="fair"
+              lang={lang}
+              count={counts.fair}
+              shortLabel
+            />
+          )}
+          {counts.unknown > 0 && (
+            <VerdictBadge
+              verdict="unknown"
+              lang={lang}
+              count={counts.unknown}
+              shortLabel
+            />
+          )}
+        </div>
+
+        {(hiddenCount > 0 || showAllItems) && attentionItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllItems((v) => !v)}
+            className="text-[12px] font-semibold text-brand hover:underline shrink-0 cursor-pointer"
+          >
+            {showAllItems
+              ? lang === 'en'
+                ? 'Flagged only'
+                : 'Chỉ món giá cao'
+              : lang === 'en'
+              ? `All ${matchedItems.length}`
+              : `Tất cả ${matchedItems.length}`}
+          </button>
         )}
       </div>
 
@@ -200,14 +224,17 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
         })}
       </div>
 
-      {/* How we know / Expand all items bar matching Screenshot 05 */}
+      {/* Inset "How we know · 4 sources · high confidence ›" opens drawer for the top flagged item */}
       <button
         type="button"
+        data-testid="results-how-we-know-btn"
         onClick={() => {
-          if (hiddenCount > 0 || showAllItems) {
-            setShowAllItems((v) => !v);
-          } else if (visibleItems[0]) {
-            onSelectItem(visibleItems[0]);
+          if (topFlaggedItem) {
+            if (onOpenHowWeKnow) {
+              onOpenHowWeKnow(topFlaggedItem);
+            } else {
+              onSelectItem(topFlaggedItem);
+            }
           }
         }}
         className="w-full mt-2 bg-surface-2 hover:bg-surface-3 rounded-[14px] px-3.5 py-2 flex items-center justify-between text-left transition-colors cursor-pointer"
@@ -220,11 +247,7 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
         </div>
         <div className="flex items-center gap-1 text-[12.5px] text-ink-2">
           <span>
-            {showAllItems
-              ? lang === 'en'
-                ? 'Show high prices only'
-                : 'Chỉ hiện giá cao'
-              : lang === 'en'
+            {lang === 'en'
               ? '4 sources · high confidence'
               : '4 nguồn · độ tin cậy cao'}
           </span>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { EvaluatedItem, PerceivedItem, VerdictLabel } from '../agent/types';
+import { parseStallMask } from '../lib/liveTracker';
 import { VERDICT_META } from './ui/VerdictBadge';
 
 export const VERDICT_STYLES: Record<
@@ -204,9 +205,10 @@ export const SampleMenuBoard: React.FC<SampleMenuBoardProps> = ({
 };
 
 interface SampleStallBasketProps {
-  mode: 'preview' | 'scanning' | 'results';
+  mode: 'preview' | 'scanning' | 'disambiguation' | 'results';
   lang: 'en' | 'vi';
   evaluatedItems?: EvaluatedItem[];
+  activeQuestionItemIndex?: number;
   onSelectItem?: (item: EvaluatedItem) => void;
 }
 
@@ -240,66 +242,96 @@ export const SampleStallBasket: React.FC<SampleStallBasketProps> = ({
   mode,
   lang,
   evaluatedItems = [],
+  activeQuestionItemIndex = 0,
   onSelectItem,
 }) => {
-  const evalItem = evaluatedItems[0];
-  const verdict = evalItem?.judgment.verdict || 'unknown';
-  const style = VERDICT_STYLES[verdict];
-  const pctHigh = evalItem?.judgment.pct_above_high;
-  const isResult = mode === 'results' && Boolean(evalItem);
+  const getPileProps = (pileIdx: number, fallbackLabel: string) => {
+    const evalItem = evaluatedItems.find((e) => e.index === pileIdx);
+    const verdict = evalItem?.judgment.verdict || 'unknown';
+    const style = VERDICT_STYLES[verdict];
+    const pctHigh = evalItem?.judgment.pct_above_high;
+    const isResult = mode === 'results' && Boolean(evalItem);
+    const isAskedPile =
+      (mode === 'disambiguation' || mode === 'scanning') && activeQuestionItemIndex === pileIdx;
+    const isDimmed = mode === 'disambiguation' && activeQuestionItemIndex !== pileIdx;
+
+    let boxStyle: React.CSSProperties = {
+      border: '2px solid transparent',
+    };
+
+    if (isResult) {
+      boxStyle = {
+        border: verdict === 'unknown' ? '2px dashed #7C7C86' : `2px solid ${style.border}`,
+        backgroundColor: style.fill,
+      };
+    } else if (isAskedPile) {
+      boxStyle = {
+        border: '2px dashed #7C7C86',
+        backgroundColor: 'rgba(124, 124, 134, 0.08)',
+      };
+    }
+
+    const badgeText =
+      pctHigh !== null && pctHigh !== undefined && verdict !== 'fair'
+        ? `+${pctHigh}%`
+        : lang === 'en'
+        ? style.labelEn
+        : style.labelVi;
+
+    return {
+      evalItem,
+      verdict,
+      style,
+      isResult,
+      isAskedPile,
+      isDimmed,
+      boxStyle,
+      badgeText,
+      ariaLabel: isResult
+        ? `${evalItem?.reference?.name_vi || fallbackLabel} - ${badgeText}`
+        : undefined,
+    };
+  };
+
+  const mangoPile = getPileProps(0, 'Xoài 80k/kg');
+  const camPile = getPileProps(1, 'Cam 40k/kg');
+  const dragonPile = getPileProps(2, 'Thanh long 35k/kg');
 
   return (
     <div className="relative w-full max-w-[335px] mx-auto py-2 select-none">
       <div className="grid grid-cols-12 gap-2.5 items-start">
         {/* Left: Mango basket with detection box matching Screenshot 09 */}
         <div
+          data-testid={mangoPile.isAskedPile ? 'disambiguation-target-box' : 'stall-pile-0'}
           onClick={() => {
-            if (isResult && evalItem && onSelectItem) {
-              onSelectItem(evalItem);
+            if (mangoPile.isResult && mangoPile.evalItem && onSelectItem) {
+              onSelectItem(mangoPile.evalItem);
             }
           }}
-          role={isResult ? 'button' : undefined}
-          tabIndex={isResult ? 0 : undefined}
-          aria-label={
-            isResult
-              ? `${evalItem?.reference?.name_vi || 'Xoài'} 80k/kg - ${lang === 'en' ? style.labelEn : style.labelVi}`
-              : undefined
-          }
-          style={
-            isResult
-              ? {
-                  border: verdict === 'unknown' ? '2px dashed #7C7C86' : `2px solid ${style.border}`,
-                  backgroundColor: style.fill,
-                }
-              : mode !== 'preview'
-              ? {
-                  border: '2px dashed #7C7C86',
-                }
-              : {
-                  border: '2px solid transparent',
-                }
-          }
-          className={`col-span-7 relative rounded-[24px] p-2 transition-all ${
-            isResult ? 'cursor-pointer hover:brightness-98' : ''
-          }`}
+          role={mangoPile.isResult ? 'button' : undefined}
+          tabIndex={mangoPile.isResult ? 0 : undefined}
+          aria-label={mangoPile.ariaLabel}
+          style={mangoPile.boxStyle}
+          className={`col-span-7 relative rounded-[24px] p-2 transition-all duration-200 ${
+            mangoPile.isResult ? 'cursor-pointer hover:brightness-98' : ''
+          } ${mangoPile.isDimmed ? 'opacity-40 brightness-75' : 'opacity-100'}`}
         >
-          {/* Top-right badge */}
-          {!isResult && mode !== 'preview' && (
-            <span className="absolute -top-2.5 right-3 w-6 h-6 rounded-full bg-unsure text-white text-[12px] font-bold flex items-center justify-center shadow-sm">
+          {/* Top-right "?" pin when asking user */}
+          {mangoPile.isAskedPile && (
+            <span
+              data-testid="disambiguation-question-pin"
+              className="absolute -top-2.5 right-3 w-6 h-6 rounded-full bg-unsure text-white text-[12px] font-bold flex items-center justify-center shadow-sm"
+            >
               ?
             </span>
           )}
 
-          {isResult && (
+          {mangoPile.isResult && (
             <span
-              style={{ backgroundColor: style.dot }}
+              style={{ backgroundColor: mangoPile.style.dot }}
               className="absolute -top-2.5 right-3 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-sm tabular-nums"
             >
-              {pctHigh !== null && pctHigh !== undefined && verdict !== 'fair'
-                ? `+${pctHigh}%`
-                : lang === 'en'
-                ? style.labelEn
-                : style.labelVi}
+              {mangoPile.badgeText}
             </span>
           )}
 
@@ -317,26 +349,96 @@ export const SampleStallBasket: React.FC<SampleStallBasketProps> = ({
         </div>
 
         {/* Right: Secondary fruit baskets (Cam & Thanh long) matching Screenshot 09 */}
-        <div className="col-span-5 flex flex-col gap-2.5 pt-1.5">
-          <div className="bg-[#D8D4CA] rounded-[18px] p-2.5 pb-3 relative">
-            <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <span key={i} aria-hidden="true">🍊</span>
-              ))}
-            </div>
-            <div className="inline-flex items-center bg-surface text-ink font-bold text-[12.5px] px-2.5 py-1 rounded-full shadow-xs">
-              Cam 40k/kg
+        <div className="col-span-5 flex flex-col gap-2.5 pt-1">
+          {/* Top-right: Cam 40k/kg */}
+          <div
+            data-testid={camPile.isAskedPile ? 'disambiguation-target-box' : 'stall-pile-1'}
+            onClick={() => {
+              if (camPile.isResult && camPile.evalItem && onSelectItem) {
+                onSelectItem(camPile.evalItem);
+              }
+            }}
+            role={camPile.isResult ? 'button' : undefined}
+            tabIndex={camPile.isResult ? 0 : undefined}
+            aria-label={camPile.ariaLabel}
+            style={camPile.boxStyle}
+            className={`relative rounded-[20px] p-1 transition-all duration-200 ${
+              camPile.isResult ? 'cursor-pointer hover:brightness-98' : ''
+            } ${camPile.isDimmed ? 'opacity-45 brightness-75' : 'opacity-100'}`}
+          >
+            {camPile.isAskedPile && (
+              <span
+                data-testid="disambiguation-question-pin"
+                className="absolute -top-2 right-2.5 w-5 h-5 rounded-full bg-unsure text-white text-[11px] font-bold flex items-center justify-center shadow-sm z-10"
+              >
+                ?
+              </span>
+            )}
+            {camPile.isResult && (
+              <span
+                style={{ backgroundColor: camPile.style.dot }}
+                className="absolute -top-2 right-2.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold text-white shadow-sm tabular-nums z-10"
+              >
+                {camPile.badgeText}
+              </span>
+            )}
+            <div className="bg-[#D8D4CA] rounded-[16px] p-2.5 pb-3 relative">
+              <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span key={i} aria-hidden="true">
+                    🍊
+                  </span>
+                ))}
+              </div>
+              <div className="inline-flex items-center bg-surface text-ink font-bold text-[12px] px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
+                Cam 40k/kg
+              </div>
             </div>
           </div>
 
-          <div className="bg-[#D8D4CA] rounded-[18px] p-2.5 pb-3 relative">
-            <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <span key={i} aria-hidden="true">🌺</span>
-              ))}
-            </div>
-            <div className="inline-flex items-center bg-surface text-ink font-bold text-[12px] px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap">
-              Thanh long 35k/kg
+          {/* Bottom-right: Thanh long 35k/kg */}
+          <div
+            data-testid={dragonPile.isAskedPile ? 'disambiguation-target-box' : 'stall-pile-2'}
+            onClick={() => {
+              if (dragonPile.isResult && dragonPile.evalItem && onSelectItem) {
+                onSelectItem(dragonPile.evalItem);
+              }
+            }}
+            role={dragonPile.isResult ? 'button' : undefined}
+            tabIndex={dragonPile.isResult ? 0 : undefined}
+            aria-label={dragonPile.ariaLabel}
+            style={dragonPile.boxStyle}
+            className={`relative rounded-[20px] p-1 transition-all duration-200 ${
+              dragonPile.isResult ? 'cursor-pointer hover:brightness-98' : ''
+            } ${dragonPile.isDimmed ? 'opacity-45 brightness-75' : 'opacity-100'}`}
+          >
+            {dragonPile.isAskedPile && (
+              <span
+                data-testid="disambiguation-question-pin"
+                className="absolute -top-2 right-2.5 w-5 h-5 rounded-full bg-unsure text-white text-[11px] font-bold flex items-center justify-center shadow-sm z-10"
+              >
+                ?
+              </span>
+            )}
+            {dragonPile.isResult && (
+              <span
+                style={{ backgroundColor: dragonPile.style.dot }}
+                className="absolute -top-2 right-2.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold text-white shadow-sm tabular-nums z-10"
+              >
+                {dragonPile.badgeText}
+              </span>
+            )}
+            <div className="bg-[#D8D4CA] rounded-[16px] p-2 pb-2.5 relative">
+              <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span key={i} aria-hidden="true">
+                    🌺
+                  </span>
+                ))}
+              </div>
+              <div className="inline-flex items-center bg-surface text-ink font-bold text-[11px] px-2 py-0.5 rounded-full shadow-xs whitespace-nowrap">
+                Thanh long 35k/kg
+              </div>
             </div>
           </div>
         </div>
@@ -347,10 +449,11 @@ export const SampleStallBasket: React.FC<SampleStallBasketProps> = ({
 
 interface UploadedPhotoCanvasProps {
   imageDataUrl: string;
-  mode: 'preview' | 'scanning' | 'results';
+  mode: 'preview' | 'scanning' | 'disambiguation' | 'results';
   lang: 'en' | 'vi';
   perceivedItems?: PerceivedItem[];
   evaluatedItems?: EvaluatedItem[];
+  activeQuestionItemIndex?: number;
   onSelectItem?: (item: EvaluatedItem) => void;
 }
 
@@ -360,8 +463,12 @@ export const UploadedPhotoCanvas: React.FC<UploadedPhotoCanvasProps> = ({
   lang,
   perceivedItems = [],
   evaluatedItems = [],
+  activeQuestionItemIndex = 0,
   onSelectItem,
 }) => {
+  const askedItem =
+    mode === 'disambiguation' ? perceivedItems[activeQuestionItemIndex] : undefined;
+
   return (
     <div className="w-full max-w-[335px] mx-auto flex justify-center">
       {/* Shrink-wrap the image so box_2d percentages map onto the photo, not onto letterboxing. */}
@@ -370,7 +477,9 @@ export const UploadedPhotoCanvas: React.FC<UploadedPhotoCanvasProps> = ({
           src={imageDataUrl}
           alt="Captured menu or market stall"
           referrerPolicy="no-referrer"
-          className="block max-w-full max-h-[min(420px,50vh)] w-auto h-auto"
+          className={`block max-w-full max-h-[min(420px,50vh)] w-auto h-auto transition-all ${
+            mode === 'disambiguation' ? 'brightness-65' : ''
+          }`}
         />
 
         {/* Brand-blue boxes while scanning */}
@@ -384,25 +493,85 @@ export const UploadedPhotoCanvas: React.FC<UploadedPhotoCanvasProps> = ({
                 style={{
                   top: `${ymin / 10}%`,
                   left: `${xmin / 10}%`,
-                  height: `${Math.max(6, (ymax - ymin) / 10)}%`,
-                  width: `${Math.max(15, (xmax - xmin) / 10)}%`,
+                  height: `${Math.max(1.2, (ymax - ymin) / 10)}%`,
+                  width: `${Math.max(4, (xmax - xmin) / 10)}%`,
                 }}
-                className="absolute border-2 border-brand bg-brand/10 rounded-[8px] pointer-events-none"
+                className="absolute border-2 border-brand bg-brand/10 rounded-[6px] pointer-events-none"
               />
             );
           })}
 
+        {/* Disambiguation mode: show ONLY the asked-about item in a dashed grey box with a "?" pin */}
+        {mode === 'disambiguation' && askedItem?.box_2d && (
+          <div
+            data-testid="disambiguation-target-box"
+            style={{
+              top: `${askedItem.box_2d[0] / 10}%`,
+              left: `${askedItem.box_2d[1] / 10}%`,
+              height: `${Math.max(4, (askedItem.box_2d[2] - askedItem.box_2d[0]) / 10)}%`,
+              width: `${Math.max(8, (askedItem.box_2d[3] - askedItem.box_2d[1]) / 10)}%`,
+              border: '2px dashed #7C7C86',
+              backgroundColor: 'rgba(255, 255, 255, 0.14)',
+              boxShadow: '0 0 0 9999px rgba(14, 15, 18, 0.42)',
+            }}
+            className="absolute rounded-[14px] pointer-events-none z-10"
+          >
+            <span
+              data-testid="disambiguation-question-pin"
+              className="absolute -top-2.5 right-3 w-6 h-6 rounded-full bg-unsure text-white text-[12px] font-bold flex items-center justify-center shadow-sm"
+            >
+              ?
+            </span>
+          </div>
+        )}
+
+        {/* Polygon mask SVG overlay in results mode when item has an array-of-points mask */}
+        {mode === 'results' && (
+          <svg
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
+            className="absolute inset-0 w-full h-full pointer-events-none"
+          >
+            {evaluatedItems
+              .filter((e) => Array.isArray(e.perceived.mask) && e.perceived.mask.length >= 3)
+              .map((evalItem) => {
+                const verdict = evalItem.judgment.verdict;
+                const style = VERDICT_STYLES[verdict];
+                const pts = (evalItem.perceived.mask as [number, number][])
+                  .map(([x, y]) => `${x},${y}`)
+                  .join(' ');
+                return (
+                  <polygon
+                    key={`mask-poly-${evalItem.index}`}
+                    points={pts}
+                    fill={style.fill}
+                    stroke={style.border}
+                    strokeWidth={6}
+                    strokeLinejoin="round"
+                  />
+                );
+              })}
+          </svg>
+        )}
+
         {/* Detection boxes in results mode */}
         {mode === 'results' &&
           (() => {
-            const judged = evaluatedItems.filter((e) => e.reference && e.perceived.box_2d);
-            return judged.map((evalItem) => {
+            const rowsWithBoxes = evaluatedItems.filter(
+              (e) => e.perceived.box_2d && !e.perceived.is_addon
+            );
+            return rowsWithBoxes.map((evalItem) => {
               const [ymin, xmin, ymax, xmax] = evalItem.perceived.box_2d;
               const verdict = evalItem.judgment.verdict;
               const style = VERDICT_STYLES[verdict];
               const pctHigh = evalItem.judgment.pct_above_high;
               const isFair = verdict === 'fair';
               const isUnsure = verdict === 'unknown';
+              const hasPolygonMask =
+                Array.isArray(evalItem.perceived.mask) && evalItem.perceived.mask.length >= 3;
+              const hasPngMask =
+                typeof evalItem.perceived.mask === 'string' &&
+                evalItem.perceived.mask.trim().length > 0;
               const showPctPill =
                 (verdict === 'overpriced' || verdict === 'slightly_high') &&
                 pctHigh !== null &&
@@ -423,15 +592,36 @@ export const UploadedPhotoCanvas: React.FC<UploadedPhotoCanvasProps> = ({
                   style={{
                     top: `${ymin / 10}%`,
                     left: `${xmin / 10}%`,
-                    height: `${Math.max(5, (ymax - ymin) / 10)}%`,
-                    width: `${Math.max(14, (xmax - xmin) / 10)}%`,
-                    borderColor: isFair ? 'rgba(22, 163, 106, 0.35)' : style.border,
-                    backgroundColor: isFair ? 'rgba(22, 163, 106, 0.06)' : style.fill,
-                    borderWidth: '2px',
+                    height: `${Math.max(1.2, (ymax - ymin) / 10)}%`,
+                    width: `${Math.max(4, (xmax - xmin) / 10)}%`,
+                    borderColor: hasPolygonMask
+                      ? 'transparent'
+                      : isFair
+                      ? 'rgba(22, 163, 106, 0.45)'
+                      : style.border,
+                    backgroundColor:
+                      hasPolygonMask || hasPngMask
+                        ? 'transparent'
+                        : isFair
+                        ? 'rgba(22, 163, 106, 0.08)'
+                        : style.fill,
+                    borderWidth: hasPolygonMask ? '0px' : '1.5px',
                     borderStyle: isUnsure ? 'dashed' : 'solid',
                   }}
-                  className="absolute rounded-[8px] cursor-pointer active:scale-[0.98] transition-transform"
+                  className="absolute rounded-[6px] cursor-pointer active:scale-[0.98] transition-transform"
                 >
+                  {hasPngMask && typeof evalItem.perceived.mask === 'string' && (
+                    <img
+                      src={
+                        evalItem.perceived.mask.startsWith('data:')
+                          ? evalItem.perceived.mask
+                          : `data:image/png;base64,${evalItem.perceived.mask}`
+                      }
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-fill rounded-[6px] opacity-35 pointer-events-none"
+                    />
+                  )}
                   {showPctPill && (
                     <span
                       style={{ backgroundColor: style.dot }}
@@ -455,3 +645,4 @@ export const UploadedPhotoCanvas: React.FC<UploadedPhotoCanvasProps> = ({
     </div>
   );
 };
+

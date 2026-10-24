@@ -81,7 +81,7 @@ test('deterministic judge evaluates fair, slightly_high, overpriced, and low-con
   assert.equal(lowConfVerdict.verdict, 'unknown');
 });
 
-test('demo menu pipeline produces 3 fair, 2 slightly_high, 2 overpriced items', async () => {
+test('demo menu pipeline produces 3 fair, 2 slightly_high, 2 overpriced items and full trace', async () => {
   const res = await runPipeline({ demoMode: true, demoSample: 'menu', stepDelayMs: 0 });
   assert.equal(res.status, 'complete');
   assert.equal(res.evaluatedItems.length, 7);
@@ -93,6 +93,13 @@ test('demo menu pipeline produces 3 fair, 2 slightly_high, 2 overpriced items', 
   assert.equal(counts.fair, 3);
   assert.equal(counts.slightly_high, 2);
   assert.equal(counts.overpriced, 2);
+
+  const traceIds = (res.perception.trace ?? []).map((t) => t.id);
+  assert.deepEqual(traceIds, ['ocr', 'read', 'fuse', 'match', 'lookup', 'maps', 'judge', 'respond']);
+  for (const step of res.perception.trace ?? []) {
+    assert.equal(typeof step.ms, 'number');
+    assert.ok(step.detail.length > 0);
+  }
 });
 
 test('demo stall pipeline pauses for mango disambiguation and resumes cleanly', async () => {
@@ -111,6 +118,8 @@ test('demo stall pipeline pauses for mango disambiguation and resumes cleanly', 
   });
   assert.equal(resumedCat.status, 'complete');
   assert.equal(resumedCat.evaluatedItems[0].judgment.verdict, 'fair');
+  const matchStep = resumedCat.perception.trace?.find((t) => t.id === 'match');
+  assert.equal(matchStep?.detail, '1 asked you: xoài cát');
 
   // Resume choosing Xoài Đài Loan (30-45k/kg) -> 80k/kg is overpriced
   const resumedDl = await runPipeline({
@@ -174,3 +183,128 @@ test('price context: café raises the ceiling, outside the Old Quarter lowers it
   const tet = applyContext(pho, { area: 'old_quarter', venue: 'street', date: new Date('2027-02-01') });
   assert.ok(tet.factors.some((f) => f.id === 'tet'));
 });
+
+test('Google Maps area_kind mapping: tourist_core -> old_quarter, local -> elsewhere, mixed -> old_quarter with venue one step lower', async () => {
+  const { applyContext, mapAreaKindToArea, stepDownVenue } = await import('./context');
+  const { buildMapsTraceStep } = await import('./maps');
+  const bunCha = (await lookup('bun_cha'))!;
+
+  assert.equal(mapAreaKindToArea('tourist_core'), 'old_quarter');
+  assert.equal(mapAreaKindToArea('mixed'), 'old_quarter');
+  assert.equal(mapAreaKindToArea('local'), 'elsewhere');
+
+  assert.equal(stepDownVenue('tourist'), 'cafe');
+  assert.equal(stepDownVenue('cafe'), 'eatery');
+  assert.equal(stepDownVenue('eatery'), 'street');
+  assert.equal(stepDownVenue('street'), 'street');
+
+  // 1. tourist_core in cafe -> old_quarter + cafe scale, with area_name chip "Hoàn Kiếm · tourist area"
+  const touristCoreCafe = applyContext(bunCha, {
+    area: 'elsewhere',
+    area_kind: 'tourist_core',
+    area_name: 'Hoàn Kiếm',
+    venue: 'cafe',
+    date: new Date('2026-10-24'),
+  });
+  const pureCafe = applyContext(bunCha, {
+    area: 'old_quarter',
+    venue: 'cafe',
+    date: new Date('2026-10-24'),
+  });
+  assert.equal(touristCoreCafe.reference.high_vnd, pureCafe.reference.high_vnd);
+  assert.ok(touristCoreCafe.factors.some((f) => f.label_en === 'Hoàn Kiếm · tourist area'));
+
+  // 2. mixed in cafe -> old_quarter + eatery scale (venue stepped down one level from cafe -> eatery)
+  const mixedCafe = applyContext(bunCha, {
+    area: 'old_quarter',
+    area_kind: 'mixed',
+    area_name: 'Ba Đình',
+    venue: 'cafe',
+    date: new Date('2026-10-24'),
+  });
+  const pureEatery = applyContext(bunCha, {
+    area: 'old_quarter',
+    venue: 'eatery',
+    date: new Date('2026-10-24'),
+  });
+  assert.equal(mixedCafe.reference.high_vnd, pureEatery.reference.high_vnd);
+  assert.ok(mixedCafe.reference.high_vnd < touristCoreCafe.reference.high_vnd);
+  assert.ok(mixedCafe.factors.some((f) => f.label_en === 'Ba Đình · mixed area'));
+
+  // 3. local in street -> elsewhere scale
+  const localStreet = applyContext(bunCha, {
+    area: 'old_quarter',
+    area_kind: 'local',
+    area_name: 'Đống Đa',
+    venue: 'street',
+    date: new Date('2026-10-24'),
+  });
+  const pureElsewhere = applyContext(bunCha, {
+    area: 'elsewhere',
+    venue: 'street',
+    date: new Date('2026-10-24'),
+  });
+  assert.equal(localStreet.reference.high_vnd, pureElsewhere.reference.high_vnd);
+  assert.ok(localStreet.factors.some((f) => f.label_en === 'Đống Đa · local area'));
+
+  // 4. Trace step formatting for skipped (no location), unavailable, and grounded
+  const skippedStep = buildMapsTraceStep({ hasLocation: false });
+  assert.equal(skippedStep.detail, 'skipped · no location');
+
+  const unavailStep = buildMapsTraceStep({
+    hasLocation: true,
+    contextResult: { unavailable: true },
+    ms: 420,
+  });
+  assert.equal(unavailStep.detail, 'unavailable here');
+
+  const groundedStep = buildMapsTraceStep({
+    hasLocation: true,
+    contextResult: {
+      unavailable: false,
+      area_kind: 'tourist_core',
+      area_name: 'Hoàn Kiếm',
+      summary_en: 'Tourist core',
+      summary_vi: 'Khu du lịch',
+      sources: [{ title: 'Hoàn Kiếm', uri: 'https://maps.google.com/?cid=1' }],
+    },
+    ms: 1400,
+  });
+  assert.equal(groundedStep.detail, 'Google Maps · Hoàn Kiếm, tourist core · 1.4s');
+});
+
+test('Part 7: trace maps into 5 plain-language steps and AbortController cancels pipeline cleanly', async () => {
+  const { mapTraceToCheckingSteps } = await import('../components/AgentWorkingSheet');
+  const { getCrowdStatsForItem } = await import('../lib/storage');
+
+  const res = await runPipeline({ demoMode: true, demoSample: 'menu', stepDelayMs: 0 });
+  const steps = mapTraceToCheckingSteps(res.perception.trace ?? [], null);
+  assert.equal(steps.length, 5);
+  assert.deepEqual(
+    steps.map((s) => s.title),
+    [
+      'Reading the menu',
+      'Understanding items',
+      'Matching dishes',
+      'Checking prices near you',
+      'Writing tips',
+    ]
+  );
+  assert.ok(steps.every((s) => s.status === 'done'));
+
+  // Crowd stats for bun_cha default seed
+  const crowd = getCrowdStatsForItem('bun_cha');
+  assert.ok(crowd);
+  assert.equal(crowd.count, 6);
+  assert.equal(crowd.median_vnd, 55000);
+
+  // AbortController cancels runPipeline
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    () => runPipeline({ demoMode: true, demoSample: 'menu', stepDelayMs: 50, signal: controller.signal }),
+    (err: Error) => err.name === 'AbortError'
+  );
+});
+
+

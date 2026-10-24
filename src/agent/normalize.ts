@@ -55,9 +55,9 @@ function scoreCandidate(queryVi: string, queryEn: string, ref: PriceReference): 
   const refViPlain = stripAccents(refViNorm);
   const refEnPlain = stripAccents(ref.name_en);
 
-  if (qViNorm === refViNorm) return 1.0;
+  if (qViNorm === refViNorm) return 0.94;
   // Accent-free comparison only when the query itself has no accents (typed or OCR'd without them)
-  if (!queryHasAccents && qViPlain && qViPlain === refViPlain) return 0.95;
+  if (!queryHasAccents && qViPlain && qViPlain === refViPlain) return 0.92;
 
   for (const alias of ref.aliases) {
     const aliasNorm = alias.toLowerCase().trim().normalize('NFC');
@@ -88,7 +88,7 @@ function buildDisambiguationQuestion(
   perceived: PerceivedItem,
   candidates: CandidateMatch[]
 ): ConfirmationQuestion {
-  // Special curated copy for Mango ("Which mango is this?") matching Screen 6
+  // Curated copy for Mango ("Which mango is this?") matching Screenshot 09
   if (candidates.length >= 2 && candidates.slice(0, 2).every((c) => c.ref.id.startsWith('xoai'))) {
     const allRefs = getAllReferences();
     const xoaiCat = allRefs.find((r) => r.id === 'xoai_cat')!;
@@ -99,15 +99,15 @@ function buildDisambiguationQuestion(
       perceived_name_vi: perceived.name_vi,
       prompt_en: 'Which mango is this?',
       prompt_vi: 'Đây là loại xoài nào?',
-      subtitle_en: "These two have very different prices, so we'd rather ask than guess.",
-      subtitle_vi: 'Hai loại xoài này có mức giá rất khác nhau, bạn chọn giúp nhé.',
+      subtitle_en: 'It helps us compare the right price. Mango types differ a lot.',
+      subtitle_vi: 'Giúp so sánh đúng mức giá vì các loại xoài chênh nhau khá nhiều.',
       options: [
         {
           ref_id: xoaiCat.id,
           name_vi: 'Xoài cát',
-          name_en: 'Hoà Lộc golden mango',
-          description_en: 'Small, golden, very sweet',
-          description_vi: 'Quả nhỏ, vỏ vàng ươm, rất ngọt',
+          name_en: 'Cat Chu mango',
+          description_en: 'sweet, small',
+          description_vi: 'Xoài cát Chu · ngọt thơm, quả nhỏ',
           typical_range_text: 'Typical 60–90k/kg',
           emoji: '🥭',
           bg_tint: '#F9E5A7',
@@ -115,9 +115,9 @@ function buildDisambiguationQuestion(
         {
           ref_id: xoaiDl.id,
           name_vi: 'Xoài Đài Loan',
-          name_en: 'Taiwan green mango',
-          description_en: 'Big, green skin, crunchy',
-          description_vi: 'Quả to, vỏ xanh, ăn giòn',
+          name_en: 'Taiwan mango',
+          description_en: 'large, green',
+          description_vi: 'Xoài Đài Loan · quả to, vỏ xanh',
           typical_range_text: 'Typical 30–45k/kg',
           emoji: '🥭',
           bg_tint: '#D9EAD3',
@@ -138,13 +138,17 @@ function buildDisambiguationQuestion(
     bg_tint: idx === 0 ? '#F9E5A7' : '#D9EAD3',
   }));
 
+  const rawItemName = (perceived.name_en || perceived.name_vi || 'item').trim();
+  const lowerItemName = rawItemName.toLowerCase();
+  const capItemName = rawItemName.charAt(0).toUpperCase() + rawItemName.slice(1).toLowerCase();
+
   return {
     item_index: itemIndex,
     perceived_name_vi: perceived.name_vi,
-    prompt_en: `“${perceived.name_vi}” — which one is it?`,
-    prompt_vi: `“${perceived.name_vi}” là món nào?`,
-    subtitle_en: 'These are priced differently, so we’d rather ask than guess.',
-    subtitle_vi: 'Hai món này có mức giá khác nhau, bạn xác nhận giúp nhé.',
+    prompt_en: `Which ${lowerItemName} is this?`,
+    prompt_vi: `Đây là loại ${perceived.name_vi.toLowerCase()} nào?`,
+    subtitle_en: `It helps us compare the right price. ${capItemName} types differ a lot.`,
+    subtitle_vi: 'Giúp chúng tôi so sánh đúng mức giá vì các loại này chênh nhau khá nhiều.',
     options,
   };
 }
@@ -187,7 +191,9 @@ export async function normalize(
       const conv = basePrice ? convertUnitPrice(item.price_vnd ?? basePrice, item.unit, chosenRef?.unit) : null;
       normalizedItems.push({
         index,
-        perceived: item,
+        perceived: chosenRef
+          ? { ...item, name_vi: chosenRef.name_vi, name_en: chosenRef.name_en }
+          : item,
         matched_id: chosenRef ? chosenRef.id : null,
         match_score: 1.0,
         normalized_price_vnd: conv ? conv.normalized_vnd : basePrice,

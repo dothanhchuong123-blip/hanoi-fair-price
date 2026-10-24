@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import { VENUE_LABELS } from '../agent/context';
 import { AreaType, VenueType } from '../agent/types';
+import {
+  DelegatePreference,
+  getDelegatePreference,
+  setDelegatePreference,
+} from '../lib/liveTracker';
 import { Chip } from './ui';
 
 interface ContextBarProps {
@@ -32,7 +37,16 @@ export const ContextBar: React.FC<ContextBarProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [delegatePref, setDelegatePrefState] = useState<DelegatePreference>(() =>
+    getDelegatePreference()
+  );
   const venueLabel = VENUE_LABELS[venue];
+
+  const handleCycleDelegate = (next: DelegatePreference) => {
+    setDelegatePreference(next);
+    setDelegatePrefState(next);
+  };
 
   return (
     <div className="mb-2 rounded-[14px] bg-surface-2 px-3.5 py-2">
@@ -81,8 +95,18 @@ export const ContextBar: React.FC<ContextBarProps> = ({
             ))}
           </div>
 
-          <div className="text-[11.5px] font-bold uppercase tracking-wider text-ink-3 mt-3 mb-1.5">
-            {lang === 'en' ? 'Where' : 'Ở đâu'}
+          <div className="flex items-center justify-between mt-3 mb-1.5">
+            <div className="text-[11.5px] font-bold uppercase tracking-wider text-ink-3">
+              {lang === 'en' ? 'Where' : 'Ở đâu'}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              aria-label="Toggle AR tracker delegate settings"
+              className="text-[11px] text-ink-3 hover:text-ink-2 cursor-pointer"
+            >
+              {showAdvanced ? 'Hide AR' : 'AR'}
+            </button>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(AREA_LABELS) as AreaType[]).map((a) => (
@@ -118,8 +142,33 @@ export const ContextBar: React.FC<ContextBarProps> = ({
               </span>
             </Chip>
           </div>
+
+          {showAdvanced && (
+            <div className="mt-3 pt-2 border-t border-line flex items-center justify-between gap-2">
+              <span className="text-[12px] text-ink-2">
+                {lang === 'en' ? 'AR tracker delegate' : 'Bộ xử lý AR'}
+              </span>
+              <div className="flex items-center gap-1">
+                {(['auto', 'CPU', 'GPU'] as DelegatePreference[]).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => handleCycleDelegate(opt)}
+                    className={`px-2 py-0.5 rounded-md text-[11.5px] font-semibold cursor-pointer ${
+                      delegatePref === opt
+                        ? 'bg-ink text-white'
+                        : 'bg-surface text-ink-2 border border-line'
+                    }`}
+                  >
+                    {opt === 'auto' ? 'Auto (iOS CPU)' : opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
+

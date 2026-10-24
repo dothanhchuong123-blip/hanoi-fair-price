@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, Pencil } from 'lucide-react';
+import { getAllReferences } from '../agent/lookup';
 import { ConfirmationQuestion } from '../agent/types';
 import { MangoSvg } from './SamplePhotos';
 import { Button, Sheet } from './ui';
@@ -22,17 +23,51 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
   const [selectedRefId, setSelectedRefId] = useState<string | 'none'>(
     question.options[0]?.ref_id || 'none'
   );
+  const [customText, setCustomText] = useState('');
+
+  useEffect(() => {
+    setSelectedRefId(question.options[0]?.ref_id || 'none');
+    setCustomText('');
+  }, [question.item_index, question.options]);
+
   const isMango = question.options.some((o) => o.ref_id.startsWith('xoai'));
+
+  const handleConfirm = () => {
+    if (selectedRefId === 'none' && customText.trim()) {
+      const q = customText.trim().toLowerCase();
+      const found = getAllReferences().find(
+        (r) =>
+          r.name_vi.toLowerCase().includes(q) ||
+          r.name_en.toLowerCase().includes(q) ||
+          r.aliases.some((a) => a.toLowerCase().includes(q))
+      );
+      if (found) {
+        onAnswer(found.id);
+        return;
+      }
+    }
+    onAnswer(selectedRefId);
+  };
 
   return (
     <Sheet
       data-testid="disambiguation-sheet"
       className="max-h-[72vh] overflow-y-auto overscroll-contain"
     >
-      <div className="text-[11.5px] font-bold uppercase tracking-wider text-ink-3">
-        {lang === 'en'
-          ? `QUICK CHECK${totalQuestions > 1 ? ` · ${questionIndex + 1} OF ${totalQuestions}` : ''}`
-          : `KIỂM TRA NHANH${totalQuestions > 1 ? ` · ${questionIndex + 1}/${totalQuestions}` : ''}`}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11.5px] font-bold uppercase tracking-wider text-ink-3">
+          {lang === 'en' ? 'QUICK CHECK' : 'KIỂM TRA NHANH'}
+        </div>
+        {totalQuestions > 1 && (
+          <span
+            data-testid="question-step-counter"
+            className="text-[12px] font-bold text-ink-2 bg-surface-2 px-2.5 py-0.5 rounded-full tabular-nums"
+          >
+            {lang === 'en'
+              ? `${questionIndex + 1} of ${totalQuestions}`
+              : `${questionIndex + 1}/${totalQuestions}`}
+          </span>
+        )}
       </div>
 
       <h2 className="font-display text-[23px] leading-tight text-ink mt-1">
@@ -73,7 +108,7 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
                 </div>
                 <div className="text-[13px] leading-snug text-ink-2 truncate">
                   {lang === 'en'
-                    ? `${opt.name_en} · ${opt.description_en.toLowerCase()}`
+                    ? `${opt.name_en} · ${opt.description_en}`
                     : opt.description_vi}
                 </div>
               </div>
@@ -111,7 +146,7 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
               {lang === 'en' ? 'None of these' : 'Không phải các loại trên'}
             </div>
             <div className="text-[13px] leading-snug text-ink-2">
-              {lang === 'en' ? 'Type what you see' : 'Bỏ qua món này'}
+              {lang === 'en' ? 'Type what you see' : 'Nhập tên món bạn thấy'}
             </div>
           </div>
 
@@ -125,6 +160,20 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
             {selectedRefId === 'none' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
           </div>
         </button>
+
+        {selectedRefId === 'none' && (
+          <input
+            type="text"
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            placeholder={
+              lang === 'en'
+                ? 'e.g. Xoài tượng, Mận hậu… (optional)'
+                : 'VD: Xoài tượng, Mận hậu… (tùy chọn)'
+            }
+            className="w-full rounded-[14px] bg-surface border border-line px-3.5 py-2.5 text-[14px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-brand"
+          />
+        )}
       </div>
 
       {/* Primary Confirm Button + Secondary Skip Link */}
@@ -132,7 +181,7 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
         <Button
           variant="primary"
           size="md"
-          onClick={() => onAnswer(selectedRefId)}
+          onClick={handleConfirm}
           className="w-full"
         >
           {lang === 'en' ? 'Confirm' : 'Xác nhận'}
@@ -150,3 +199,4 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
     </Sheet>
   );
 };
+

@@ -1,4 +1,4 @@
-import { PriceContext, PriceFactor, PriceReference, VenueType } from './types';
+import { AreaType, MapsAreaKind, PriceContext, PriceFactor, PriceReference, VenueType } from './types';
 
 /**
  * Price context: moves a catalog range to match where and when the price was quoted.
@@ -19,7 +19,7 @@ interface Scale {
   high: number;
 }
 
-const OLD_QUARTER_CENTER = { lat: 21.0333, lng: 105.8500 }; // Hàng Đào / Hàng Bạc area
+export const OLD_QUARTER_CENTER = { lat: 21.0333, lng: 105.8500 }; // Hàng Đào / Hàng Bạc area
 const OLD_QUARTER_RADIUS_KM = 1.3; // covers the Old Quarter and the lake edge
 
 const VENUE_SCALE: Record<VenueType, Scale> = {
@@ -51,15 +51,41 @@ export function isTetWindow(date: Date): boolean {
   });
 }
 
-export function isInOldQuarter(lat: number, lng: number): boolean {
+export function haversineMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat - OLD_QUARTER_CENTER.lat);
-  const dLng = toRad(lng - OLD_QUARTER_CENTER.lng);
-  const a =
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat)) * Math.cos(toRad(OLD_QUARTER_CENTER.lat)) * Math.sin(dLng / 2) ** 2;
-  const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return km <= OLD_QUARTER_RADIUS_KM;
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+export function isInOldQuarter(lat: number, lng: number): boolean {
+  const meters = haversineMeters({ lat, lng }, OLD_QUARTER_CENTER);
+  return meters / 1000 <= OLD_QUARTER_RADIUS_KM;
+}
+
+/** Maps a Google Maps grounded area_kind to our deterministic AreaType. */
+export function mapAreaKindToArea(areaKind: MapsAreaKind): AreaType {
+  return areaKind === 'local' ? 'elsewhere' : 'old_quarter';
+}
+
+/** Lowers the venue scale by one step (used when area_kind === 'mixed'). */
+export function stepDownVenue(venue: VenueType): VenueType {
+  switch (venue) {
+    case 'tourist':
+      return 'cafe';
+    case 'cafe':
+      return 'eatery';
+    case 'eatery':
+    case 'street':
+    default:
+      return 'street';
+  }
 }
 
 export function defaultContext(venue: VenueType = 'street'): PriceContext {
@@ -79,20 +105,41 @@ export function applyContext(
   const factors: PriceFactor[] = [];
   const isProduce = ref.category === 'fruit' || ref.category === 'vegetable';
 
-  if (ctx.area === 'elsewhere') {
+  const effectiveArea: AreaType = ctx.area_kind ? mapAreaKindToArea(ctx.area_kind) : ctx.area;
+  const effectiveVenue: VenueType =
+    ctx.area_kind === 'mixed' ? stepDownVenue(ctx.venue) : ctx.venue;
+  const areaName = ctx.area_name?.trim();
+
+  if (effectiveArea === 'elsewhere') {
     scales.push(OUTSIDE_OLD_QUARTER);
     factors.push({
       id: 'area',
       emoji: '📍',
-      label_en: 'Outside the Old Quarter',
-      label_vi: 'Ngoài Phố cổ',
+      label_en: areaName ? `${areaName} · local area` : 'Outside the Old Quarter',
+      label_vi: areaName ? `${areaName} · khu dân cư` : 'Ngoài Phố cổ',
       effect: pct(OUTSIDE_OLD_QUARTER.high),
+    });
+  } else if (areaName && ctx.area_kind === 'tourist_core') {
+    factors.push({
+      id: 'area',
+      emoji: '📍',
+      label_en: `${areaName} · tourist area`,
+      label_vi: `${areaName} · khu du lịch`,
+      effect: 0,
+    });
+  } else if (areaName && ctx.area_kind === 'mixed') {
+    factors.push({
+      id: 'area',
+      emoji: '📍',
+      label_en: `${areaName} · mixed area`,
+      label_vi: `${areaName} · khu hỗn hợp`,
+      effect: 0,
     });
   }
 
   // Venue type only matters for prepared food and drinks; market produce is priced per kg.
-  if (!isProduce && ctx.venue !== 'street') {
-    const scale = VENUE_SCALE[ctx.venue];
+  if (!isProduce && effectiveVenue !== 'street') {
+    const scale = VENUE_SCALE[effectiveVenue];
     const label = VENUE_LABELS[ctx.venue];
     scales.push(scale);
     factors.push({ id: 'venue', emoji: label.emoji, label_en: label.en, label_vi: label.vi, effect: pct(scale.high) });
