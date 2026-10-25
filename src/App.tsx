@@ -50,6 +50,7 @@ import {
   PassportStamp,
   saveCrowdReport,
   setOnboardingDone,
+  streetInitials,
 } from './lib/storage';
 
 type ScreenState =
@@ -533,7 +534,7 @@ export default function App({ lang, setLang, start = 'camera', dishId }: AppProp
         {/* MOBILE PHONE FRAME (Full bleed at 375px-430px, framed on desktop) */}
         <main
           aria-label="Chợ Price Lens mobile app"
-          className="relative w-full max-w-[480px] lg:w-[400px] h-[100dvh] lg:h-[min(820px,calc(100vh-124px))] lg:rounded-[32px] lg:shadow-pop lg:ring-1 lg:ring-ink/10 overflow-hidden flex flex-col camera-bg shrink-0 lg:sticky lg:top-[92px]"
+          className="relative w-full max-w-[480px] lg:w-[392px] h-[100dvh] lg:h-[min(820px,calc(100vh-124px))] lg:rounded-[46px] lg:shadow-pop lg:ring-[11px] lg:ring-[#14110F] overflow-hidden flex flex-col camera-bg shrink-0 lg:sticky lg:top-[92px]"
         >
           {/* Hidden file input for gallery upload */}
           <input
@@ -587,8 +588,8 @@ export default function App({ lang, setLang, start = 'camera', dishId }: AppProp
                   role="status"
                   className="absolute top-14 left-4 right-4 z-50 bg-surface border border-line rounded-[20px] p-3.5 flex items-center gap-3.5 text-ink shadow-xl"
                 >
-                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-brand bg-brand-soft flex items-center justify-center text-[22px] shrink-0">
-                    {stampToast.emoji}
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-brand bg-brand-soft flex items-center justify-center font-serif font-semibold text-[16px] text-brand shrink-0">
+                    {streetInitials(stampToast.street)}
                   </div>
                   <div className="min-w-0">
                     <div className="font-bold text-[15.5px] leading-snug text-ink">

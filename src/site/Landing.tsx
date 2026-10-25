@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Camera, Keyboard, MapPin, ScanLine, ShieldCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { getAllReferences } from '../agent/lookup';
 import { PriceReference, VerdictLabel } from '../agent/types';
-import { RangeBar, VerdictBadge } from '../components/ui';
+import { DishThumb, RangeBar } from '../components/ui';
+import { VERDICT_META } from '../components/ui/VerdictBadge';
 import { formatShortVnd } from '../lib/parsePrice';
+import { photoFor } from '../lib/photos';
 import { perUnit } from '../lib/units';
+import { PhoneQrCard } from './PhoneQr';
 import { navigate } from './router';
 import { LogoMark } from './SiteHeader';
 
@@ -18,8 +21,8 @@ function quickVerdict(ref: PriceReference, quoted: number): VerdictLabel {
 
 const DEMO_CASES: Array<{ id: string; quoteFactor: number }> = [
   { id: 'banh_mi', quoteFactor: 2.4 },
-  { id: 'pho_bo', quoteFactor: 1.0 },
-  { id: 'xoai_cat', quoteFactor: 1.25 },
+  { id: 'bun_cha', quoteFactor: 0.9 },
+  { id: 'ca_phe_trung', quoteFactor: 1.25 },
 ];
 
 const GUIDE_TEASER = [
@@ -28,12 +31,27 @@ const GUIDE_TEASER = [
   'bun_cha',
   'ca_phe_trung',
   'bia_hoi',
-  'nuoc_dua',
+  'nuoc_mia',
+  'banh_cuon',
   'xoai_cat',
-  'kem_trang_tien',
 ];
 
-const DemoCard: React.FC<{ lang: Lang }> = ({ lang }) => {
+/** One coloured dot and a word: the whole verdict at a glance */
+export const VerdictDot: React.FC<{ verdict: VerdictLabel; lang: Lang; className?: string }> = ({
+  verdict,
+  lang,
+  className = '',
+}) => {
+  const meta = VERDICT_META[verdict];
+  return (
+    <span className={`inline-flex items-center gap-1.5 font-semibold ${className}`} style={{ color: meta.text }}>
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: meta.dot }} />
+      {lang === 'en' ? meta.labelEn : meta.labelVi}
+    </span>
+  );
+};
+
+function useDemoCases() {
   const catalog = useMemo(() => getAllReferences(), []);
   const cases = useMemo(
     () =>
@@ -49,82 +67,137 @@ const DemoCard: React.FC<{ lang: Lang }> = ({ lang }) => {
     const t = window.setInterval(() => setI((n) => (n + 1) % cases.length), 4200);
     return () => window.clearInterval(t);
   }, [cases.length]);
-  const { ref, quoted, verdict } = cases[i];
+  return { ...cases[i], i, total: cases.length };
+}
 
+type DemoCase = ReturnType<typeof useDemoCases>;
+
+/** The result sheet on its own, cycling through the demo cases */
+const DemoSheet: React.FC<{ lang: Lang }> = ({ lang }) => <DemoSheetView lang={lang} demo={useDemoCases()} />;
+
+/** The result sheet as it slides up over the camera */
+const DemoSheetView: React.FC<{ lang: Lang; demo: DemoCase; framed?: boolean }> = ({ lang, demo, framed }) => {
+  const { ref, quoted, verdict, i, total } = demo;
   return (
-    <div className="relative">
-      <div className="absolute -inset-6 rounded-[44px] bg-brand/10 blur-2xl" aria-hidden="true" />
-      <div className="relative bg-surface rounded-[28px] border border-line shadow-pop p-5 sm:p-6 max-w-[440px] mx-auto">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-2">
-            <MapPin className="w-3.5 h-3.5" /> Hoàn Kiếm · Old Quarter
-          </span>
-          <span className="text-[11.5px] font-semibold text-ink-3 tabular-nums">
-            {i + 1} / {cases.length}
-          </span>
-        </div>
-
-        <div key={ref.id} className="animate-float-up">
-          <div className="mt-4 flex items-center gap-3.5">
-            <span className="w-14 h-14 rounded-full bg-surface-2 flex items-center justify-center text-[28px]">
-              {ref.emoji}
-            </span>
-            <div className="min-w-0">
-              <div className="font-semibold text-[17px] text-ink leading-tight">
-                {lang === 'en' ? ref.name_en : ref.name_vi}
-              </div>
-              <div className="text-[13px] text-ink-2">{lang === 'en' ? ref.name_vi : ref.name_en}</div>
-            </div>
-          </div>
-
-          <div className="mt-5 text-[13px] font-medium text-ink-2">
-            {lang === 'en' ? 'Seller said' : 'Người bán báo'}
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-[48px] leading-none text-ink tabular-nums">
-              {formatShortVnd(quoted)}
-            </span>
-            <span className="text-[15px] font-semibold text-ink-2">{perUnit(ref.unit, lang)}</span>
-          </div>
-
-          <div className="mt-4 flex items-center gap-2">
-            <VerdictBadge verdict={verdict} lang={lang} className="text-[13.5px] px-3 py-1.5" />
-            <span className="text-[13.5px] text-ink-2">
-              {lang === 'en' ? 'Locals pay' : 'Người địa phương trả'}{' '}
-              <strong className="text-ink tabular-nums">
-                {formatShortVnd(ref.low_vnd)}–{formatShortVnd(ref.high_vnd)}
-              </strong>
-            </span>
-          </div>
-
-          <RangeBar
-            low={ref.low_vnd}
-            median={ref.median_vnd}
-            high={ref.high_vnd}
-            quoted={quoted}
-            verdict={verdict}
-            lang={lang}
-            className="mt-4"
+    <div
+      className={`bg-surface text-ink ${
+        framed ? 'rounded-t-[26px] px-4 pt-2.5 pb-5' : 'rounded-[26px] border border-line shadow-pop p-5'
+      }`}
+    >
+      {framed && <div className="w-9 h-1.5 rounded-full bg-grabber mx-auto mb-3" aria-hidden="true" />}
+      <div key={ref.id} className="animate-float-up">
+        <div className="flex items-center gap-3">
+          <DishThumb
+            refId={ref.id}
+            name={ref.name_vi}
+            category={ref.category}
+            className="w-14 h-14 rounded-[14px] text-[22px]"
           />
-        </div>
-
-        <div className="mt-5 pt-4 border-t border-line flex items-center justify-between gap-3">
-          <span className="text-[12.5px] text-ink-3">
-            {lang === 'en' ? 'Example check · real reference prices' : 'Ví dụ · giá tham khảo thật'}
-          </span>
-          <div className="flex gap-1.5" aria-hidden="true">
-            {cases.map((_, n) => (
-              <span
-                key={n}
-                className={`h-1.5 rounded-full transition-all ${n === i ? 'w-5 bg-ink' : 'w-1.5 bg-line'}`}
-              />
-            ))}
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-[16.5px] leading-tight truncate">{ref.name_vi}</div>
+            <div className="text-[12.5px] text-ink-2 truncate">{ref.name_en}</div>
+            <VerdictDot verdict={verdict} lang={lang} className="text-[13px] mt-1" />
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-serif text-[30px] leading-none tabular-nums">{formatShortVnd(quoted)}</div>
+            <div className="text-[11.5px] text-ink-3 mt-1">{perUnit(ref.unit, lang)}</div>
           </div>
         </div>
+        <RangeBar
+          low={ref.low_vnd}
+          median={ref.median_vnd}
+          high={ref.high_vnd}
+          quoted={quoted}
+          verdict={verdict}
+          lang={lang}
+          className="mt-4"
+        />
+        <p className="mt-3 text-[13px] text-ink-2">
+          {lang === 'en' ? 'Locals usually pay ' : 'Người địa phương thường trả '}
+          <strong className="text-ink tabular-nums">
+            {formatShortVnd(ref.low_vnd)}–{formatShortVnd(ref.high_vnd)}
+          </strong>
+        </p>
+      </div>
+      <div className="mt-4 flex gap-1.5 justify-center" aria-hidden="true">
+        {Array.from({ length: total }).map((_, n) => (
+          <span key={n} className={`h-1.5 rounded-full transition-all ${n === i ? 'w-5 bg-ink' : 'w-1.5 bg-line'}`} />
+        ))}
       </div>
     </div>
   );
 };
+
+/** A phone running the app: camera on a real dish, the verdict sheet on top */
+const PhoneMock: React.FC<{ lang: Lang }> = ({ lang }) => {
+  const demo = useDemoCases();
+  const photo = photoFor(demo.ref.id);
+  return (
+    <button
+      type="button"
+      onClick={() => navigate({ page: 'app', start: 'sample' })}
+      aria-label={lang === 'en' ? 'Try the demo' : 'Thử bản demo'}
+      className="group relative block w-[340px] rounded-[54px] bg-[#14110F] p-[11px] shadow-pop cursor-pointer transition-transform hover:-translate-y-1"
+    >
+      <div className="relative h-[min(690px,calc(100vh-190px))] min-h-[560px] rounded-[44px] overflow-hidden bg-[#0E0C0A] text-left">
+        {/* The camera: a soft fill of the scene, with the whole dish sharp and framed above the sheet */}
+        {photo && (
+          <div key={demo.ref.id} className="absolute inset-0 animate-[fadeIn_0.5s_ease-out]">
+            <img src={photo.src} alt="" className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-70" />
+            <img
+              src={photo.src}
+              alt=""
+              className="absolute left-0 right-0 top-[96px] w-full aspect-[4/3] object-cover"
+              style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent)' }}
+            />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/50" />
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[96px] h-[28px] rounded-full bg-black" />
+        <div className="absolute top-14 left-0 right-0 flex justify-center">
+          <span className="glass-surface rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold text-white">
+            Hoàn Kiếm · {lang === 'en' ? 'Old Quarter' : 'Phố cổ'}
+          </span>
+        </div>
+        <div className="absolute left-5 right-5 top-[112px] aspect-[4/3] scale-[0.9]" aria-hidden="true">
+          <span className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-white rounded-tl-[14px]" />
+          <span className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-white rounded-tr-[14px]" />
+          <span className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-white rounded-bl-[14px]" />
+          <span className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-white rounded-br-[14px]" />
+        </div>
+        <div className="absolute bottom-0 left-0 right-0">
+          <DemoSheetView lang={lang} demo={demo} framed />
+        </div>
+      </div>
+      <span className="absolute -right-4 top-24 bg-ink text-white text-[12.5px] font-semibold rounded-full px-3.5 py-2 shadow-pop opacity-0 group-hover:opacity-100 transition-opacity">
+        {lang === 'en' ? 'Try the demo →' : 'Thử demo →'}
+      </span>
+    </button>
+  );
+};
+
+const FoodCard: React.FC<{ r: PriceReference; lang: Lang }> = ({ r, lang }) => (
+  <button
+    type="button"
+    onClick={() => navigate({ page: 'app', start: 'quote', dishId: r.id })}
+    className="group text-left cursor-pointer"
+  >
+    <div className="overflow-hidden rounded-[20px] bg-surface-2">
+      <DishThumb
+        refId={r.id}
+        name={r.name_vi}
+        category={r.category}
+        className="w-full aspect-[4/3] text-[44px] group-hover:scale-[1.04] transition-transform duration-500"
+      />
+    </div>
+    <div className="mt-3 font-semibold text-[16px] leading-tight truncate">{r.name_vi}</div>
+    <div className="text-[13px] text-ink-3 truncate">{r.name_en}</div>
+    <div className="mt-1.5 text-[15px] font-semibold text-fair tabular-nums">
+      {formatShortVnd(r.low_vnd)}–{formatShortVnd(r.high_vnd)}
+      <span className="text-[12.5px] font-medium text-ink-3"> {perUnit(r.unit, lang)}</span>
+    </div>
+  </button>
+);
 
 export const Landing: React.FC<{ lang: Lang }> = ({ lang }) => {
   const catalog = useMemo(() => getAllReferences(), []);
@@ -133,59 +206,16 @@ export const Landing: React.FC<{ lang: Lang }> = ({ lang }) => {
   ) as PriceReference[];
   const en = lang === 'en';
 
-  const steps = [
-    {
-      icon: <ScanLine className="w-5 h-5" />,
-      title: en ? 'Point or type' : 'Chụp hoặc nhập',
-      body: en
-        ? 'Aim at a menu, price board or fruit stall. Or just type what the seller said.'
-        : 'Hướng camera vào thực đơn, bảng giá, quầy hoa quả. Hoặc nhập giá người bán báo.',
-    },
-    {
-      icon: <ShieldCheck className="w-5 h-5" />,
-      title: en ? 'Get the verdict' : 'Nhận kết luận',
-      body: en
-        ? 'Fair, a bit high, or above typical, with the range locals pay and how sure we are.'
-        : 'Hợp lý, hơi cao hay cao hơn thường lệ, kèm khoảng giá phổ biến và độ tin cậy.',
-    },
-    {
-      icon: <MapPin className="w-5 h-5" />,
-      title: en ? 'Pay fair, or walk 300 m' : 'Trả đúng giá, hoặc đi 300 m',
-      body: en
-        ? 'A polite phrase to ask for a better price, and nearby places that sell it for less.'
-        : 'Câu nói lịch sự để mặc cả, và các quán gần đó bán rẻ hơn.',
-    },
-  ];
-
-  const faqs = en
-    ? [
-        ['Where do the prices come from?', 'A hand-checked reference list of 56 Old Quarter dishes, drinks and fruits, adjusted for the area, the kind of venue and the season. Reports from people like you refine it over time.'],
-        ['Is a high price a scam?', 'Not necessarily. A sit-down café with a lake view costs more than a plastic-stool stall. We show the typical range and the reasons, so you decide.'],
-        ['Do you store my photos?', 'No. Photos are read in memory to find the prices and are never saved.'],
-        ['Does it work outside the Old Quarter?', 'Yes, for the rest of Hanoi. We adjust the expected range when you are outside the tourist core.'],
-        ['Is it free?', 'Yes. No account, no sign-up.'],
-      ]
-    : [
-        ['Giá lấy từ đâu?', 'Danh sách tham khảo 56 món ăn, đồ uống, hoa quả ở Phố cổ, điều chỉnh theo khu vực, loại quán và mùa vụ. Báo giá của người dùng giúp cập nhật dần.'],
-        ['Giá cao có phải là chặt chém?', 'Không hẳn. Quán cà phê view hồ đắt hơn quán vỉa hè. Chúng tôi cho thấy khoảng giá và lý do, bạn tự quyết định.'],
-        ['Ảnh của tôi có bị lưu không?', 'Không. Ảnh chỉ được đọc tạm thời để tìm giá và không bao giờ lưu lại.'],
-        ['Dùng ngoài Phố cổ được không?', 'Được, trong Hà Nội. Khoảng giá được điều chỉnh khi bạn ở ngoài khu du lịch.'],
-        ['Có miễn phí không?', 'Có. Không cần tài khoản.'],
-      ];
-
   return (
     <div className="bg-bg text-ink">
-      {/* Hero */}
+      {/* Hero: on a phone, start straight away; on a laptop, hand off to the phone */}
       <section className="paper-grain">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-8 pt-10 pb-16 md:pt-20 md:pb-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-8 pt-10 pb-14 lg:pt-14 lg:pb-20 grid lg:grid-cols-[1fr_auto] gap-12 lg:gap-20 items-center">
           <div className="animate-float-up">
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-line text-[12.5px] font-semibold text-ink-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-              {en
-                ? `Hanoi Old Quarter · ${catalog.length} dishes & fruits`
-                : `Phố cổ Hà Nội · ${catalog.length} món & hoa quả`}
-            </span>
-            <h1 className="font-serif mt-5 text-[44px] sm:text-[56px] lg:text-[68px] leading-[1.02] text-ink">
+            <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-ink-3">
+              {en ? `Hà Nội · Old Quarter · ${catalog.length} dishes & fruits` : `Hà Nội · Phố cổ · ${catalog.length} món & hoa quả`}
+            </div>
+            <h1 className="font-serif mt-4 text-[46px] sm:text-[60px] lg:text-[76px] leading-[0.98] tracking-[-0.01em]">
               {en ? (
                 <>
                   Know the <em className="text-brand">fair price</em> before you pay.
@@ -196,111 +226,104 @@ export const Landing: React.FC<{ lang: Lang }> = ({ lang }) => {
                 </>
               )}
             </h1>
-            <p className="mt-5 text-[17px] sm:text-[19px] leading-relaxed text-ink-2 max-w-[540px]">
+            <p className="mt-5 text-[17px] sm:text-[19px] leading-relaxed text-ink-2 max-w-[520px]">
               {en
-                ? 'Point at a menu or type what the seller said. In seconds you see if it’s fair, what locals pay, and where it’s cheaper nearby.'
-                : 'Chụp thực đơn hoặc nhập giá người bán báo. Trong vài giây, bạn biết giá có hợp lý không, người địa phương trả bao nhiêu và chỗ nào rẻ hơn.'}
+                ? 'Point your phone at a menu or a fruit stall. In seconds you see what locals pay, and whether the price in front of you is fair.'
+                : 'Hướng điện thoại vào thực đơn hay quầy hoa quả. Vài giây sau bạn biết người địa phương trả bao nhiêu và giá trước mặt có hợp lý không.'}
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+
+            {/* Phones: open the camera right here */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 lg:hidden">
               <button
                 type="button"
                 onClick={() => navigate({ page: 'app', start: 'camera' })}
-                className="h-[56px] px-7 rounded-full bg-brand text-white text-[16px] font-semibold inline-flex items-center justify-center gap-2.5 hover:bg-brand/90 active:scale-[0.99] transition-all cursor-pointer shadow-card"
+                className="h-[56px] px-7 rounded-full bg-brand text-white text-[16px] font-semibold inline-flex items-center justify-center hover:bg-brand/90 active:scale-[0.99] transition-all cursor-pointer"
               >
-                <Camera className="w-5 h-5" />
-                {en ? 'Scan a menu' : 'Chụp thực đơn'}
+                {en ? 'Open the camera' : 'Mở camera'}
               </button>
               <button
                 type="button"
                 onClick={() => navigate({ page: 'app', start: 'quote' })}
-                className="h-[56px] px-7 rounded-full bg-surface border border-line text-ink text-[16px] font-semibold inline-flex items-center justify-center gap-2.5 hover:bg-surface-2 active:scale-[0.99] transition-all cursor-pointer"
+                className="h-[56px] px-7 rounded-full bg-surface border border-line text-ink text-[16px] font-semibold inline-flex items-center justify-center hover:bg-surface-2 transition-all cursor-pointer"
               >
-                <Keyboard className="w-5 h-5" />
-                {en ? 'Type a price' : 'Nhập giá'}
+                {en ? 'Type a price instead' : 'Hoặc nhập giá'}
               </button>
             </div>
-            <p className="mt-5 text-[13px] text-ink-3">
-              {en
-                ? 'Free · No sign-up · Photos are never stored'
-                : 'Miễn phí · Không cần đăng ký · Không lưu ảnh'}
+
+            {/* Laptops: this is a phone app, so hand over the QR code */}
+            <div className="hidden lg:block mt-9">
+              <PhoneQrCard lang={lang} className="max-w-[480px]" />
+              <div className="mt-5 flex items-center gap-5 text-[15px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => navigate({ page: 'app', start: 'sample' })}
+                  className="inline-flex items-center gap-1.5 text-ink hover:text-brand transition-colors cursor-pointer"
+                >
+                  {en ? 'Or try the demo here' : 'Hoặc thử demo tại đây'}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <span className="w-px h-4 bg-line" />
+                <button
+                  type="button"
+                  onClick={() => navigate({ page: 'app', start: 'quote' })}
+                  className="text-ink-2 hover:text-ink transition-colors cursor-pointer"
+                >
+                  {en ? 'Type a price' : 'Nhập giá'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden lg:block">
+            <PhoneMock lang={lang} />
+          </div>
+          <div className="lg:hidden max-w-[440px] w-full">
+            <DemoSheet lang={lang} />
+          </div>
+        </div>
+      </section>
+
+      {/* What things cost, with the food itself doing the decorating */}
+      <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-14 md:py-20">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-[34px] md:text-[48px] leading-[1.05]">
+              {en ? 'What things should cost' : 'Giá bao nhiêu là hợp lý'}
+            </h2>
+            <p className="mt-2 text-[16px] text-ink-2">
+              {en ? 'Typical Old Quarter prices, October 2026.' : 'Giá phổ biến ở Phố cổ, tháng 10/2026.'}
             </p>
           </div>
-          <DemoCard lang={lang} />
+          <button
+            type="button"
+            onClick={() => navigate({ page: 'guide' })}
+            className="hidden sm:inline-flex items-center gap-2 text-[15px] font-semibold text-ink hover:text-brand transition-colors cursor-pointer shrink-0"
+          >
+            {en ? `All ${catalog.length} prices` : `Tất cả ${catalog.length} giá`}
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="max-w-[1200px] mx-auto px-4 md:px-8 py-16 md:py-24">
-        <h2 className="font-serif text-[34px] md:text-[44px] leading-tight max-w-[640px]">
-          {en ? 'Three seconds at the stall. No awkward haggling.' : 'Ba giây tại quầy. Không ngại mặc cả.'}
-        </h2>
-        <div className="mt-10 grid md:grid-cols-3 gap-4">
-          {steps.map((s, n) => (
-            <div key={s.title} className="bg-surface rounded-[24px] border border-line p-6 shadow-card">
-              <div className="flex items-center justify-between">
-                <span className="w-11 h-11 rounded-full bg-brand-soft text-brand flex items-center justify-center">
-                  {s.icon}
-                </span>
-                <span className="font-serif text-[40px] leading-none text-line">0{n + 1}</span>
-              </div>
-              <h3 className="mt-5 text-[19px] font-semibold">{s.title}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{s.body}</p>
-            </div>
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+          {teaser.map((r) => (
+            <FoodCard key={r.id} r={r} lang={lang} />
           ))}
         </div>
-      </section>
-
-      {/* Guide teaser */}
-      <section className="bg-surface-2/60 border-y border-line">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-16 md:py-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <h2 className="font-serif text-[34px] md:text-[44px] leading-tight">
-                {en ? 'What things should cost' : 'Giá bao nhiêu là hợp lý'}
-              </h2>
-              <p className="mt-2 text-[16px] text-ink-2">
-                {en ? 'Typical Old Quarter prices, October 2026.' : 'Giá phổ biến ở Phố cổ, tháng 10/2026.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate({ page: 'guide' })}
-              className="inline-flex items-center gap-2 text-[15px] font-semibold text-ink hover:text-brand transition-colors cursor-pointer"
-            >
-              {en ? `See all ${catalog.length}` : `Xem tất cả ${catalog.length}`}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-            {teaser.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => navigate({ page: 'app', start: 'quote', dishId: r.id })}
-                className="text-left bg-surface rounded-[20px] border border-line p-4 hover:shadow-card hover:-translate-y-0.5 transition-all cursor-pointer"
-              >
-                <span className="w-11 h-11 rounded-full bg-surface-2 flex items-center justify-center text-[22px]">
-                  {r.emoji}
-                </span>
-                <div className="mt-3 font-semibold text-[15px] leading-tight">{en ? r.name_en : r.name_vi}</div>
-                <div className="text-[12.5px] text-ink-3">{en ? r.name_vi : r.name_en}</div>
-                <div className="mt-2.5 text-[15px] font-semibold text-fair tabular-nums">
-                  {formatShortVnd(r.low_vnd)}–{formatShortVnd(r.high_vnd)}
-                  <span className="text-ink-3 font-medium text-[12.5px]"> {perUnit(r.unit, lang)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate({ page: 'guide' })}
+          className="sm:hidden mt-8 w-full h-[52px] rounded-full border border-line bg-surface text-[15px] font-semibold cursor-pointer"
+        >
+          {en ? `See all ${catalog.length} prices` : `Xem tất cả ${catalog.length} giá`}
+        </button>
       </section>
 
       {/* Principles */}
       <section className="bg-ink text-white">
         <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-16 md:py-24 grid lg:grid-cols-[1fr_1.3fr] gap-10">
-          <h2 className="font-serif text-[34px] md:text-[44px] leading-tight">
+          <h2 className="font-serif text-[34px] md:text-[48px] leading-[1.05]">
             {en ? 'We explain. We never accuse.' : 'Giải thích rõ ràng. Không quy chụp.'}
           </h2>
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-3 gap-8">
             {(en
               ? [
                   ['Where you are', 'Prices around the lake run higher than two streets back. We adjust for it.'],
@@ -312,10 +335,10 @@ export const Landing: React.FC<{ lang: Lang }> = ({ lang }) => {
                   ['Loại quán', 'Ghế nhựa vỉa hè, quán cà phê hay nhà hàng đều có mức giá riêng.'],
                   ['Khi nào', 'Hoa quả đúng mùa rẻ hơn. Tết giá tăng. Chúng tôi tính cả điều đó.'],
                 ]
-            ).map(([t, b]) => (
+            ).map(([t, b], n) => (
               <div key={t}>
-                <div className="w-8 h-[3px] bg-brand rounded-full" />
-                <h3 className="mt-4 text-[17px] font-semibold">{t}</h3>
+                <div className="font-serif text-[15px] text-white/40 tabular-nums">0{n + 1}</div>
+                <h3 className="mt-2 text-[17px] font-semibold">{t}</h3>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-white/65">{b}</p>
               </div>
             ))}
@@ -323,58 +346,21 @@ export const Landing: React.FC<{ lang: Lang }> = ({ lang }) => {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="max-w-[820px] mx-auto px-4 md:px-8 py-16 md:py-24">
-        <h2 className="font-serif text-[34px] md:text-[44px] leading-tight text-center">
-          {en ? 'Questions' : 'Câu hỏi thường gặp'}
-        </h2>
-        <div className="mt-10 divide-y divide-line border-y border-line">
-          {faqs.map(([q, a]) => (
-            <details key={q} className="group py-5">
-              <summary className="flex items-center justify-between gap-4 cursor-pointer list-none text-[17px] font-semibold">
-                {q}
-                <span className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-[18px] text-ink-2 group-open:rotate-45 transition-transform shrink-0">
-                  +
-                </span>
-              </summary>
-              <p className="mt-3 text-[15.5px] leading-relaxed text-ink-2 pr-10">{a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA band */}
-      <section className="max-w-[1200px] mx-auto px-4 md:px-8 pb-16">
-        <div className="rounded-[32px] bg-brand text-white p-8 md:p-12 flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden relative">
-          <div className="relative">
-            <h2 className="font-serif text-[30px] md:text-[40px] leading-tight">
-              {en ? 'Heading out to eat?' : 'Sắp ra phố ăn?'}
-            </h2>
-            <p className="mt-2 text-white/80 text-[16px]">
-              {en ? 'Open it on your phone. It works right in the browser.' : 'Mở trên điện thoại. Chạy ngay trên trình duyệt.'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate({ page: 'app', start: 'camera' })}
-            className="relative h-[56px] px-7 rounded-full bg-white text-ink text-[16px] font-semibold inline-flex items-center justify-center gap-2 hover:bg-white/90 transition-colors cursor-pointer shrink-0"
-          >
-            {en ? 'Start checking prices' : 'Bắt đầu kiểm tra giá'}
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-      </section>
-
       <footer className="border-t border-line">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-ink-3">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-ink-3 text-center sm:text-left">
           <div className="flex items-center gap-2.5">
             <LogoMark className="w-7 h-7" />
             <span>Chợ Price Lens · Hà Nội</span>
           </div>
           <span>
-            {en
-              ? 'Prices are estimates for guidance only · updated Oct 2026'
-              : 'Giá chỉ mang tính tham khảo · cập nhật 10/2026'}
+            {en ? 'Free · No sign-up · Photos are never stored · ' : 'Miễn phí · Không cần đăng ký · Không lưu ảnh · '}
+            <button
+              type="button"
+              onClick={() => navigate({ page: 'guide' })}
+              className="underline underline-offset-2 hover:text-ink cursor-pointer"
+            >
+              {en ? 'Photo credits' : 'Nguồn ảnh'}
+            </button>
           </span>
         </div>
       </footer>

@@ -53,6 +53,30 @@ export const VERDICT_STYLES: Record<
   },
 };
 
+/** Green-skinned cam sành orange for the sample stall */
+const OrangeSvg: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+    <circle cx="16" cy="17" r="12" fill="#7FA23A" />
+    <circle cx="16" cy="17" r="12" fill="url(#orange-shade)" />
+    <path d="M16 5c1-2 3-3 5-2-1 2-3 3-5 2z" fill="#3F6331" />
+    <defs>
+      <radialGradient id="orange-shade" cx="0.35" cy="0.35" r="0.8">
+        <stop offset="0" stopColor="#E9A23B" stopOpacity="0.7" />
+        <stop offset="1" stopColor="#4E7424" stopOpacity="0.4" />
+      </radialGradient>
+    </defs>
+  </svg>
+);
+
+/** Pink dragon fruit with green scale tips for the sample stall */
+const DragonFruitSvg: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+    <ellipse cx="16" cy="17" rx="10" ry="12" fill="#D63F7A" />
+    <path d="M9 10l-4-3 6 1zM23 10l4-3-6 1zM8 19l-4 1 4 2zM24 19l4 1-4 2zM16 5l-1-4 3 4z" fill="#7DAA3A" />
+    <ellipse cx="13" cy="13" rx="3" ry="4" fill="#fff" opacity="0.18" />
+  </svg>
+);
+
 const MENU_ROWS = [
   { name: 'Phở bò', price: '60k' },
   { name: 'Bún chả', price: '120k' },
@@ -383,11 +407,9 @@ export const SampleStallBasket: React.FC<SampleStallBasketProps> = ({
               </span>
             )}
             <div className="bg-[#D8D4CA] rounded-[16px] p-2.5 pb-3 relative">
-              <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
+              <div className="grid grid-cols-3 gap-1 place-items-center mb-2">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <span key={i} aria-hidden="true">
-                    🍊
-                  </span>
+                  <OrangeSvg key={i} className="w-[22px] h-[22px]" />
                 ))}
               </div>
               <div className="inline-flex items-center bg-surface text-ink font-bold text-[12px] px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
@@ -429,11 +451,9 @@ export const SampleStallBasket: React.FC<SampleStallBasketProps> = ({
               </span>
             )}
             <div className="bg-[#D8D4CA] rounded-[16px] p-2 pb-2.5 relative">
-              <div className="grid grid-cols-3 gap-1 place-items-center mb-2 text-[22px] leading-none">
+              <div className="grid grid-cols-3 gap-1 place-items-center mb-2">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <span key={i} aria-hidden="true">
-                    🌺
-                  </span>
+                  <DragonFruitSvg key={i} className="w-[22px] h-[22px]" />
                 ))}
               </div>
               <div className="inline-flex items-center bg-surface text-ink font-bold text-[11px] px-2 py-0.5 rounded-full shadow-xs whitespace-nowrap">

@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { ArrowRight, Search, X } from 'lucide-react';
 import { getAllReferences } from '../agent/lookup';
 import { ItemCategory, PriceReference } from '../agent/types';
+import { DishThumb } from '../components/ui';
 import { formatShortVnd } from '../lib/parsePrice';
+import { PHOTOS } from '../lib/photos';
 import { perUnit, unitLabel } from '../lib/units';
 import { HistoryList } from './HistoryList';
 import { navigate } from './router';
@@ -30,9 +32,7 @@ export const DishCard: React.FC<{ r: PriceReference; lang: Lang }> = ({ r, lang 
   return (
     <div className="bg-surface rounded-[22px] border border-line p-4 flex flex-col hover:shadow-card transition-shadow">
       <div className="flex items-start gap-3">
-        <span className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center text-[24px] shrink-0">
-          {r.emoji || '🍜'}
-        </span>
+        <DishThumb refId={r.id} name={r.name_vi} category={r.category} className="w-14 h-14 rounded-[14px] text-[22px]" />
         <div className="min-w-0">
           <div className="font-semibold text-[15.5px] leading-tight text-ink">{en ? r.name_en : r.name_vi}</div>
           <div className="text-[13px] text-ink-3 mt-0.5">{en ? r.name_vi : r.name_en}</div>
@@ -151,6 +151,35 @@ export const Guide: React.FC<{ lang: Lang }> = ({ lang }) => {
           </div>
         </aside>
       </div>
+
+      <section id="credits" className="max-w-[1200px] mx-auto px-4 md:px-8 pb-12">
+        <details className="border-t border-line pt-5 text-[12.5px] text-ink-3">
+          <summary className="cursor-pointer font-semibold text-ink-2">
+            {en ? 'Photo credits' : 'Nguồn ảnh'}
+          </summary>
+          <p className="mt-2">
+            {en
+              ? 'Food photos come from Wikimedia Commons and are used under their free licences.'
+              : 'Ảnh món ăn lấy từ Wikimedia Commons, dùng theo giấy phép tự do.'}
+          </p>
+          <ul className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
+            {catalog
+              .filter((r) => PHOTOS[r.id])
+              .map((r) => {
+                const p = PHOTOS[r.id];
+                return (
+                  <li key={r.id} className="truncate">
+                    {r.name_vi}:{' '}
+                    <a href={p.source} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+                      {p.author || 'Wikimedia Commons'}
+                    </a>{' '}
+                    · {p.license}
+                  </li>
+                );
+              })}
+          </ul>
+        </details>
+      </section>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { getAllReferences } from '../agent/lookup';
 import { PriceReference } from '../agent/types';
 import { formatDotVnd, formatShortVnd, formatUsd } from '../lib/parsePrice';
 import { convertToReferenceUnit, getUnit, perUnit, unitsForReference } from '../lib/units';
-import { Button, IconButton } from './ui';
+import { Button, DishThumb, IconButton } from './ui';
 
 interface QuickQuoteViewProps {
   lang: 'en' | 'vi';
@@ -184,21 +184,19 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
                 type="button"
                 onClick={() => handleSelectDish(ref)}
                 aria-pressed={isSelected}
-                className={`rounded-[18px] pt-2.5 pb-2 px-1 flex flex-col items-center justify-start text-center transition-all cursor-pointer min-h-[92px] ${
+                className={`rounded-[18px] p-1 pb-2 flex flex-col items-stretch text-center transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-brand-soft ring-2 ring-brand'
                     : 'bg-surface border border-line hover:bg-surface-2'
                 }`}
               >
-                <span
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-[22px] leading-none mb-1.5 ${
-                    isSelected ? 'bg-white' : 'bg-surface-2'
-                  }`}
-                  aria-hidden="true"
-                >
-                  {ref.emoji || '🍜'}
-                </span>
-                <span className="font-semibold text-[11.5px] leading-tight text-ink line-clamp-2">
+                <DishThumb
+                  refId={ref.id}
+                  name={ref.name_vi}
+                  category={ref.category}
+                  className="w-full aspect-square rounded-[14px] text-[24px] mb-1.5"
+                />
+                <span className="font-semibold text-[11.5px] leading-tight text-ink line-clamp-2 px-0.5">
                   {ref.id === 'xoai_cat' && !searchQuery
                     ? lang === 'en'
                       ? 'Mango'

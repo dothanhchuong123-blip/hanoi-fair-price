@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { History, Trash2 } from 'lucide-react';
-import { VerdictBadge } from '../components/ui';
+import { DishThumb, VerdictBadge } from '../components/ui';
 import { formatShortVnd, formatUsd } from '../lib/parsePrice';
 import { clearHistory, getHistory, HistoryEntry, historySavings } from '../lib/storage';
 import { perUnit } from '../lib/units';
@@ -77,9 +77,7 @@ export const HistoryList: React.FC<{ lang: 'en' | 'vi'; compact?: boolean }> = (
       <ul className={`mt-3 divide-y divide-line ${compact ? 'max-h-[360px] overflow-y-auto' : ''}`}>
         {entries.map((e) => (
           <li key={e.id} className="py-3 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-[20px] shrink-0">
-              {e.emoji}
-            </span>
+            <DishThumb refId={e.item_id} name={e.name_vi} className="w-11 h-11 rounded-[12px] text-[18px]" />
             <div className="min-w-0 flex-1">
               <div className="text-[14.5px] font-semibold text-ink truncate">
                 {en ? e.name_en : e.name_vi}
