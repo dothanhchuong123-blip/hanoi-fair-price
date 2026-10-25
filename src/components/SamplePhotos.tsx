@@ -126,8 +126,8 @@ export const SampleMenuBoard: React.FC<SampleMenuBoardProps> = ({
 
             if (isScanning) {
               boxStyle = {
-                border: '2px solid #2F5BFF',
-                backgroundColor: 'rgba(47, 91, 255, 0.10)',
+                border: '2px solid #C8361D',
+                backgroundColor: 'rgba(200, 54, 29, 0.10)',
               };
             } else if (isResultRow) {
               if (isUnsure) {
@@ -137,7 +137,7 @@ export const SampleMenuBoard: React.FC<SampleMenuBoardProps> = ({
                 };
               } else if (isFair) {
                 boxStyle = {
-                  border: '2px solid #16A36A',
+                  border: '2px solid #1F8A5B',
                   backgroundColor: 'rgba(22, 163, 106, 0.10)',
                   opacity: 0.38,
                 };

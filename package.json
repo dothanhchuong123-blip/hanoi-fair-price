@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/lib/parsePrice.test.ts src/agent/pipeline.test.ts src/lib/menuQuad.test.ts src/server/fuse.test.ts src/server/tiles.test.ts src/lib/liveTracker.test.ts src/server/maps.test.ts"
+    "test": "tsx --test src/lib/parsePrice.test.ts src/agent/pipeline.test.ts src/lib/menuQuad.test.ts src/server/fuse.test.ts src/server/tiles.test.ts src/lib/liveTracker.test.ts src/server/maps.test.ts src/lib/units.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

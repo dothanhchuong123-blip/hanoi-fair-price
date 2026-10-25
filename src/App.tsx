@@ -10,7 +10,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { isInOldQuarter } from './agent/context';
-import { getAllReferences } from './agent/lookup';
 import { evaluateItems, runPipeline } from './agent/pipeline';
 import {
   AreaType,
@@ -42,9 +41,10 @@ import { NearbySheet } from './components/NearbySheet';
 import { WhatDidYouPaySheet } from './components/WhatDidYouPaySheet';
 import { HowWeKnowSheet } from './components/HowWeKnowSheet';
 import { Button, Chip, IconButton } from './components/ui';
+import { DesktopPanel } from './site/DesktopPanel';
 import { DelegateType } from './lib/liveTracker';
-import { formatShortVnd } from './lib/parsePrice';
 import {
+  addHistory,
   getOnboardingDone,
   getPassportStamps,
   PassportStamp,
@@ -63,12 +63,41 @@ type ScreenState =
 
 type BottomMode = 'menu' | 'stall' | 'quick';
 
-export default function App() {
-  const [lang, setLang] = useState<'en' | 'vi'>('en');
-  const [demoMode, setDemoMode] = useState<boolean>(false);
-  const [bottomMode, setBottomMode] = useState<BottomMode>('menu');
+interface AppProps {
+  lang: 'en' | 'vi';
+  setLang: React.Dispatch<React.SetStateAction<'en' | 'vi'>>;
+  /** Where the website sent the user: camera, quick quote, or the sample menu */
+  start?: 'camera' | 'quote' | 'sample';
+  dishId?: string;
+}
+
+/** Keep a local log of every judged price so the History list can show it */
+function recordHistory(items: EvaluatedItem[]) {
+  const entries = items
+    .filter((e) => e.judgment.quoted_vnd !== null)
+    .map((e) => ({
+      item_id: e.reference?.id ?? null,
+      name_vi: e.reference?.name_vi ?? e.perceived.name_vi,
+      name_en: e.reference?.name_en ?? e.perceived.name_en,
+      emoji: e.reference?.emoji ?? '🍜',
+      quoted_vnd: e.normalized.normalized_price_vnd ?? (e.judgment.quoted_vnd as number),
+      unit: e.normalized.normalized_unit || e.perceived.unit,
+      verdict: e.judgment.verdict,
+      typical_high_vnd: e.reference?.high_vnd ?? null,
+    }));
+  if (entries.length > 0) addHistory(entries);
+}
+
+export default function App({ lang, setLang, start = 'camera', dishId }: AppProps) {
+  const [demoMode, setDemoMode] = useState<boolean>(start === 'sample');
+  const [bottomMode, setBottomMode] = useState<BottomMode>(start === 'quote' ? 'quick' : 'menu');
+  const [quoteRefId, setQuoteRefId] = useState<string | undefined>(dishId);
   const [screen, setScreen] = useState<ScreenState>(() =>
-    getOnboardingDone() ? 'camera_home' : 'onboarding'
+    start === 'quote'
+      ? 'quick_quote'
+      : start === 'sample' || getOnboardingDone()
+      ? 'camera_home'
+      : 'onboarding'
   );
 
   // Pipeline & results state
@@ -118,6 +147,22 @@ export default function App() {
   useEffect(() => {
     setStamps(getPassportStamps());
   }, []);
+
+  // React to the website's links (e.g. "Check a price" on a guide card) while the app is open
+  useEffect(() => {
+    if (start === 'quote') {
+      setQuoteRefId(dishId);
+      setBottomMode('quick');
+      setScreen('quick_quote');
+    } else if (start === 'sample') {
+      setOnboardingDone(true);
+      setDemoMode(true);
+      setUploadedImage(null);
+      setBottomMode('menu');
+      startPipelineScan({ overrideSample: 'menu', forceDemo: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, dishId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -257,6 +302,7 @@ export default function App() {
       }
 
       setEvaluatedItems(result.evaluatedItems);
+      recordHistory(result.evaluatedItems);
       setScreen('results');
     } catch (err: unknown) {
       if (
@@ -394,6 +440,7 @@ export default function App() {
     const [evaluated] = await evaluateItems([normalized], { area, venue, date: new Date() });
 
     setEvaluatedItems([evaluated]);
+    recordHistory([evaluated]);
     setSelectedItem(evaluated);
     setScreen('results');
   };
@@ -480,15 +527,13 @@ export default function App() {
     setScreen('camera_home');
   };
 
-  const catalog = getAllReferences();
-
   return (
-    <div className="min-h-screen w-full bg-[#E5E1D8] text-ink flex justify-center items-start lg:py-6 lg:px-8">
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8">
+    <div className="w-full bg-bg text-ink flex justify-center items-start paper-grain lg:py-8 lg:px-8 lg:min-h-[calc(100vh-68px)]">
+      <div className="w-full max-w-[1200px] flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 xl:gap-12">
         {/* MOBILE PHONE FRAME (Full bleed at 375px-430px, framed on desktop) */}
         <main
           aria-label="Chợ Price Lens mobile app"
-          className="relative w-full max-w-[430px] lg:w-[390px] min-h-screen lg:min-h-[844px] lg:max-h-[860px] lg:rounded-[44px] lg:shadow-[0_24px_70px_rgba(0,0,0,0.28)] lg:border-[8px] lg:border-ink overflow-hidden flex flex-col camera-bg shrink-0"
+          className="relative w-full max-w-[480px] lg:w-[400px] h-[100dvh] lg:h-[min(820px,calc(100vh-124px))] lg:rounded-[32px] lg:shadow-pop lg:ring-1 lg:ring-ink/10 overflow-hidden flex flex-col camera-bg shrink-0 lg:sticky lg:top-[92px]"
         >
           {/* Hidden file input for gallery upload */}
           <input
@@ -521,6 +566,8 @@ export default function App() {
             /* Quick Quote Full View */
             <div className="flex-1 flex flex-col bg-bg overflow-y-auto">
               <QuickQuoteView
+                key={quoteRefId ?? 'default'}
+                initialRefId={quoteRefId}
                 lang={lang}
                 onToggleLang={() => setLang((l) => (l === 'en' ? 'vi' : 'en'))}
                 onBack={() => {
@@ -1183,124 +1230,23 @@ export default function App() {
         </main>
 
         {/* DESKTOP COMPANION PANEL (Visible on large screens >=1024px) */}
-        <aside className="hidden lg:flex flex-col flex-1 max-w-xl bg-bg text-ink rounded-[28px] p-7 shadow-lg border border-line">
-          <div className="flex items-center justify-between border-b border-line pb-4">
-            <div>
-              <h2 className="font-display text-[26px] leading-tight text-ink">
-                Chợ Price Lens · Phố cổ Hà Nội
-              </h2>
-              <p className="text-[14px] text-ink-2 mt-0.5">
-                {lang === 'en'
-                  ? 'Spatial-AI street food, drink & fruit price guide for Hanoi Old Quarter'
-                  : 'Trợ lý AI kiểm tra giá đồ ăn đường phố & hoa quả tại Phố cổ Hà Nội'}
-              </p>
-            </div>
-            <span className="text-[12.5px] font-bold text-ink-2 bg-surface-2 px-3 py-1.5 rounded-full whitespace-nowrap tabular-nums">
-              {catalog.length} Hanoi items
-            </span>
-          </div>
-
-          {/* Interactive Scenario Switcher */}
-          <div className="mt-5">
-            <h3 className="font-bold text-[12px] uppercase tracking-wider text-ink-3 mb-2.5">
-              {lang === 'en' ? 'Interactive Demo Scenarios' : 'Kịch bản thử nghiệm nhanh'}
-            </h3>
-            <div className="grid grid-cols-3 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setOnboardingDone(true);
-                  setDemoMode(true);
-                  setUploadedImage(null);
-                  setBottomMode('menu');
-                  startPipelineScan({ overrideSample: 'menu', forceDemo: true });
-                }}
-                className="bg-surface hover:bg-surface-2 border border-line rounded-[16px] p-3 text-left transition-all cursor-pointer"
-              >
-                <div className="font-bold text-[14.5px] text-ink">Sample Menu</div>
-                <div className="text-[12.5px] text-ink-2 mt-0.5">
-                  7 dishes · 2 high, 1 a bit high, 3 fair
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setOnboardingDone(true);
-                  setDemoMode(true);
-                  setUploadedImage(null);
-                  setBottomMode('stall');
-                  setUserConfirmations({});
-                  startPipelineScan({ overrideSample: 'stall', forceDemo: true });
-                }}
-                className="bg-surface hover:bg-surface-2 border border-line rounded-[16px] p-3 text-left transition-all cursor-pointer"
-              >
-                <div className="font-bold text-[14.5px] text-ink">Sample Stall</div>
-                <div className="text-[12.5px] text-ink-2 mt-0.5">
-                  Xoài 80k/kg · human-in-the-loop check
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setOnboardingDone(true);
-                  setBottomMode('quick');
-                  setScreen('quick_quote');
-                }}
-                className="bg-surface hover:bg-surface-2 border border-line rounded-[16px] p-3 text-left transition-all cursor-pointer"
-              >
-                <div className="font-bold text-[14.5px] text-ink">Quick Quote</div>
-                <div className="text-[12.5px] text-ink-2 mt-0.5">
-                  No photo · instant numpad & unit converter
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Reference Catalog Table */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-[12px] uppercase tracking-wider text-ink-3">
-                {lang === 'en'
-                  ? 'Hanoi Old Quarter Reference Catalog'
-                  : 'Bảng giá tham khảo Phố cổ Hà Nội'}
-              </h3>
-              <span className="text-[12px] text-ink-3">1 lạng = 100g · 1 cân = 1 kg</span>
-            </div>
-
-            <div className="max-h-[410px] overflow-y-auto rounded-[18px] bg-surface border border-line divide-y divide-line">
-              {catalog.map((ref) => (
-                <div
-                  key={ref.id}
-                  onClick={() => handleQuickQuoteCheck(ref, ref.median_vnd, ref.unit)}
-                  className="px-4 py-2.5 flex items-center justify-between text-[14px] hover:bg-surface-2/60 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[18px]">{ref.emoji || '🍜'}</span>
-                    <div>
-                      <span className="font-bold text-ink">{ref.name_vi}</span>
-                      <span className="text-ink-2 ml-2">{ref.name_en}</span>
-                    </div>
-                  </div>
-                  <div className="text-right tabular-nums shrink-0">
-                    <span className="font-bold text-fair">
-                      {formatShortVnd(ref.low_vnd)}–{formatShortVnd(ref.high_vnd)}
-                    </span>
-                    <span className="text-ink-3 text-[12.5px] ml-1">/{ref.unit}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Safety note */}
-          <p className="text-[12.5px] text-ink-3 mt-4 pt-3 border-t border-line">
-            {lang === 'en'
-              ? 'Prices are estimates for guidance only. Photos are processed in-memory and never stored.'
-              : 'Giá chỉ mang tính tham khảo. Ảnh chụp chỉ xử lý tức thời và không bao giờ lưu trữ.'}
-          </p>
-        </aside>
+        <DesktopPanel
+          lang={lang}
+          onTrySample={(kind) => {
+            setOnboardingDone(true);
+            setDemoMode(true);
+            setUploadedImage(null);
+            setUserConfirmations({});
+            setBottomMode(kind);
+            startPipelineScan({ overrideSample: kind, forceDemo: true });
+          }}
+          onQuickQuote={(refId) => {
+            setOnboardingDone(true);
+            setQuoteRefId(refId);
+            setBottomMode('quick');
+            setScreen('quick_quote');
+          }}
+        />
       </div>
     </div>
   );
