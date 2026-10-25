@@ -62,7 +62,7 @@ export const RangeBar: React.FC<RangeBarProps> = ({
             style={{
               left: `${lowPct}%`,
               width: `${Math.max(4, highPct - lowPct)}%`,
-              backgroundColor: 'rgba(22, 163, 106, 0.36)',
+              backgroundColor: 'rgba(31, 138, 91, 0.34)',
             }}
           />
 

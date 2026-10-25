@@ -160,7 +160,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   {/* Row 1: Phở bò 60k - Fair */}
                   <div
                     style={{
-                      border: '2px solid #16A36A',
+                      border: '2px solid #1F8A5B',
                       backgroundColor: 'rgba(22, 163, 106, 0.12)',
                     }}
                     className="relative flex items-center justify-between px-3.5 py-1.5 rounded-[10px]"
@@ -175,7 +175,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   {/* Row 2: Bún chả 120k - +71% */}
                   <div
                     style={{
-                      border: '2px solid #E5484D',
+                      border: '2px solid #C8361D',
                       backgroundColor: 'rgba(229, 72, 77, 0.12)',
                     }}
                     className="relative flex items-center justify-between px-3.5 py-1.5 rounded-[10px]"
@@ -190,7 +190,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   {/* Row 3: Bánh mì 30k - +17% */}
                   <div
                     style={{
-                      border: '2px solid #E08A00',
+                      border: '2px solid #D99A1E',
                       backgroundColor: 'rgba(224, 138, 0, 0.12)',
                     }}
                     className="relative flex items-center justify-between px-3.5 py-1.5 rounded-[10px]"

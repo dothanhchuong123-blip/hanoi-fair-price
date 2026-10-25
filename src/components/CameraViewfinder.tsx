@@ -468,7 +468,7 @@ export const CameraViewfinder = forwardRef<CameraViewfinderHandle, CameraViewfin
             <polygon
               points={polyPoints}
               fill="none"
-              stroke="#2F5BFF"
+              stroke="#C8361D"
               strokeWidth="2.8"
               strokeLinejoin="round"
               filter="url(#brand-glow)"
@@ -483,9 +483,9 @@ export const CameraViewfinder = forwardRef<CameraViewfinderHandle, CameraViewfin
                   y="0"
                   width="100"
                   height="0.9"
-                  fill="#2F5BFF"
+                  fill="#C8361D"
                   style={{
-                    filter: 'drop-shadow(0 0 6px #2F5BFF)',
+                    filter: 'drop-shadow(0 0 6px #C8361D)',
                   }}
                 >
                   <animate
@@ -525,7 +525,7 @@ export const CameraViewfinder = forwardRef<CameraViewfinderHandle, CameraViewfin
               boxShadow: locked
                 ? '0 0 0 2000px rgba(8,8,10,0.45)'
                 : '0 0 0 2000px rgba(8,8,10,0.12)',
-              border: locked ? '2px solid #2F5BFF' : '2px solid rgba(255,255,255,0.85)',
+              border: locked ? '2px solid #C8361D' : '2px solid rgba(255,255,255,0.85)',
             }}
           />
         )}
