@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { EvaluatedItem } from '../agent/types';
 import { formatShortVnd, parsePrice } from '../lib/parsePrice';
-import { PassportStamp } from '../lib/storage';
+import { PassportStamp, streetInitials } from '../lib/storage';
 import { Button, IconButton, Sheet } from './ui';
 
 interface WhatDidYouPaySheetProps {
@@ -116,11 +116,11 @@ export const WhatDidYouPaySheet: React.FC<WhatDidYouPaySheetProps> = ({
               title={stamp ? stamp.street : undefined}
               className={`w-[54px] h-[54px] rounded-full flex items-center justify-center border-2 border-dashed ${
                 stamp
-                  ? 'border-brand bg-brand-soft text-[24px]'
+                  ? 'border-brand bg-brand-soft text-brand font-serif font-semibold text-[17px]'
                   : 'border-line bg-surface-2 text-ink-3 font-bold text-[18px]'
               }`}
             >
-              {stamp ? stamp.emoji : '?'}
+              {stamp ? streetInitials(stamp.street) : '?'}
             </div>
           ))}
         </div>

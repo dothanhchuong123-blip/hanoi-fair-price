@@ -10,7 +10,7 @@ import { OLD_QUARTER_CENTER, haversineMeters } from '../agent/context';
 import { fetchMapsNearby } from '../agent/maps';
 import { EvaluatedItem, MapsNearbyResult, NearbyPlace } from '../agent/types';
 import { formatShortVnd } from '../lib/parsePrice';
-import { Button, Chip, IconButton, Sheet } from './ui';
+import { Button, Chip, DishThumb, IconButton, Sheet } from './ui';
 import { IllustratedMap } from './IllustratedMap';
 
 const MAP_ID =
@@ -460,13 +460,12 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        {/* Food thumbnail */}
-                        <div
-                          aria-hidden="true"
-                          className="w-12 h-12 rounded-[14px] bg-surface-2 border border-line flex items-center justify-center text-[22px] shrink-0"
-                        >
-                          {ref?.emoji || '🍜'}
-                        </div>
+                        <DishThumb
+                          refId={ref?.id}
+                          name={ref?.name_vi ?? place.name}
+                          category={ref?.category}
+                          className="w-12 h-12 rounded-[14px] text-[18px]"
+                        />
 
                         <div className="min-w-0">
                           <div className="font-bold text-[15.5px] text-ink leading-snug truncate flex items-center gap-1.5">

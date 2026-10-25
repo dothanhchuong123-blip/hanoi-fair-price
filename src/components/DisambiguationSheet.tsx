@@ -3,7 +3,7 @@ import { Check, Pencil } from 'lucide-react';
 import { getAllReferences } from '../agent/lookup';
 import { ConfirmationQuestion } from '../agent/types';
 import { MangoSvg } from './SamplePhotos';
-import { Button, Sheet } from './ui';
+import { Button, DishThumb, Sheet } from './ui';
 
 interface DisambiguationSheetProps {
   lang: 'en' | 'vi';
@@ -98,7 +98,7 @@ export const DisambiguationSheet: React.FC<DisambiguationSheetProps> = ({
                 {isMango ? (
                   <MangoSvg className="w-[30px] h-[30px]" />
                 ) : (
-                  <span className="text-[24px]">{opt.emoji}</span>
+                  <DishThumb refId={opt.ref_id} name={opt.name_vi} className="w-full h-full rounded-[12px] text-[20px]" />
                 )}
               </div>
 

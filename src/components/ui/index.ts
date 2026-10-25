@@ -6,3 +6,4 @@ export * from './Sheet';
 export * from './RangeBar';
 export * from './ConfidenceMeter';
 export * from './StepList';
+export * from './DishThumb';

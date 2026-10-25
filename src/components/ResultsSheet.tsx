@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SlidersHorizontal, ChevronRight } from 'lucide-react';
 import { EvaluatedItem, VerdictLabel } from '../agent/types';
 import { formatShortVnd } from '../lib/parsePrice';
-import { RangeBar, Sheet, VerdictBadge } from './ui';
+import { DishThumb, RangeBar, Sheet, VerdictBadge } from './ui';
 
 interface ResultsSheetProps {
   lang: 'en' | 'vi';
@@ -186,10 +186,12 @@ export const ResultsSheet: React.FC<ResultsSheetProps> = ({
               onClick={() => onSelectItem(item)}
               className="w-full py-2.5 flex items-center gap-3 text-left hover:bg-surface-2/50 rounded-[12px] px-1 transition-colors cursor-pointer"
             >
-              {/* Food emoji thumbnail */}
-              <div className="w-[42px] h-[42px] rounded-[12px] bg-surface-2 flex items-center justify-center text-[21px] shrink-0">
-                {ref.emoji || '🍜'}
-              </div>
+              <DishThumb
+                refId={ref.id}
+                name={ref.name_vi}
+                category={ref.category}
+                className="w-[52px] h-[52px] rounded-[14px] text-[20px]"
+              />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">

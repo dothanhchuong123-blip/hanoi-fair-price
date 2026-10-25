@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Keyboard, Search, ShoppingBasket, UtensilsCrossed } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { getAllReferences } from '../agent/lookup';
+import { DishThumb } from '../components/ui';
 import { formatShortVnd } from '../lib/parsePrice';
 import { perUnit } from '../lib/units';
 import { HistoryList } from './HistoryList';
+import { PhoneQrCard } from './PhoneQr';
 
 interface DesktopPanelProps {
   lang: 'en' | 'vi';
@@ -19,7 +21,7 @@ function fold(text: string): string {
     .replace(/đ/g, 'd');
 }
 
-/** The right-hand column next to the app on laptops: examples, the price guide and history */
+/** The column next to the app on laptops: hand-off to the phone, examples, the price guide and history */
 export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, onQuickQuote }) => {
   const en = lang === 'en';
   const catalog = useMemo(() => getAllReferences(), []);
@@ -39,28 +41,22 @@ export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, o
 
   const examples = [
     {
-      icon: <UtensilsCrossed className="w-5 h-5" />,
+      photo: 'bun_cha',
       title: en ? 'A street menu' : 'Thực đơn quán',
       body: en ? '7 dishes, read and judged' : '7 món, đọc và đánh giá',
       onClick: () => onTrySample('menu'),
     },
     {
-      icon: <ShoppingBasket className="w-5 h-5" />,
+      photo: 'xoai_cat',
       title: en ? 'A fruit stall' : 'Quầy hoa quả',
       body: en ? 'Mango at 80k per kg' : 'Xoài 80k một cân',
       onClick: () => onTrySample('stall'),
     },
-    {
-      icon: <Keyboard className="w-5 h-5" />,
-      title: en ? 'Type a price' : 'Nhập giá',
-      body: en ? 'No photo needed' : 'Không cần ảnh',
-      onClick: () => onQuickQuote(),
-    },
   ];
 
   return (
-    <aside className="hidden lg:flex flex-col flex-1 min-w-0 max-w-[620px] text-ink pt-2">
-      <h1 className="font-serif text-[44px] leading-[1.05]">
+    <aside className="hidden lg:flex flex-col flex-1 min-w-0 max-w-[600px] text-ink pt-2">
+      <h1 className="font-serif text-[46px] leading-[1.02]">
         {en ? (
           <>
             Is that price <em className="text-brand">fair?</em>
@@ -71,32 +67,44 @@ export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, o
           </>
         )}
       </h1>
-      <p className="mt-3 text-[16.5px] leading-relaxed text-ink-2 max-w-[520px]">
+      <p className="mt-3 text-[16.5px] leading-relaxed text-ink-2 max-w-[500px]">
         {en
-          ? 'Drop in a menu photo or type what the seller said. On your phone, the camera reads prices live.'
-          : 'Tải ảnh thực đơn hoặc nhập giá người bán báo. Trên điện thoại, camera đọc giá trực tiếp.'}
+          ? 'This works best on your phone, where the camera reads prices live. On a laptop, try an example or type a price.'
+          : 'Dùng tốt nhất trên điện thoại, nơi camera đọc giá trực tiếp. Trên máy tính, hãy thử ví dụ hoặc nhập giá.'}
       </p>
 
-      <div className="mt-7">
-        <div className="text-[12px] font-bold uppercase tracking-[0.08em] text-ink-3 mb-3">
-          {en ? 'Try an example' : 'Thử ví dụ'}
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {examples.map((ex) => (
-            <button
-              key={ex.title}
-              type="button"
-              onClick={ex.onClick}
-              className="text-left bg-surface rounded-[20px] border border-line p-4 hover:shadow-card hover:-translate-y-0.5 transition-all cursor-pointer"
-            >
-              <span className="w-10 h-10 rounded-full bg-brand-soft text-brand flex items-center justify-center">
-                {ex.icon}
-              </span>
-              <div className="mt-3 font-semibold text-[15px]">{ex.title}</div>
-              <div className="text-[13px] text-ink-2 mt-0.5">{ex.body}</div>
-            </button>
-          ))}
-        </div>
+      <PhoneQrCard lang={lang} className="mt-6" />
+
+      <div className="mt-7 grid grid-cols-[1fr_1fr_0.8fr] gap-3">
+        {examples.map((ex) => (
+          <button
+            key={ex.title}
+            type="button"
+            onClick={ex.onClick}
+            className="group text-left bg-surface rounded-[20px] border border-line overflow-hidden hover:shadow-card transition-shadow cursor-pointer"
+          >
+            <DishThumb
+              refId={ex.photo}
+              name={ex.title}
+              className="w-full h-[92px] text-[28px] group-hover:scale-[1.04] transition-transform duration-500"
+            />
+            <div className="p-3.5 pt-3">
+              <div className="font-semibold text-[15px]">{ex.title}</div>
+              <div className="text-[12.5px] text-ink-2 mt-0.5">{ex.body}</div>
+            </div>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onQuickQuote()}
+          className="text-left bg-ink text-white rounded-[20px] p-3.5 flex flex-col justify-between hover:bg-ink/90 transition-colors cursor-pointer"
+        >
+          <span className="font-serif text-[34px] leading-none tabular-nums">45k?</span>
+          <span>
+            <span className="block font-semibold text-[15px]">{en ? 'Type a price' : 'Nhập giá'}</span>
+            <span className="block text-[12.5px] text-white/65 mt-0.5">{en ? 'No photo needed' : 'Không cần ảnh'}</span>
+          </span>
+        </button>
       </div>
 
       <div className="mt-8 bg-surface rounded-[24px] border border-line shadow-card overflow-hidden">
@@ -122,9 +130,7 @@ export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, o
               </button>
             ))}
           </div>
-          {tab === 'guide' && (
-            <span className="text-[12.5px] text-ink-3">1 lạng = 100 g</span>
-          )}
+          {tab === 'guide' && <span className="text-[12.5px] text-ink-3">1 lạng = 100 g</span>}
         </div>
 
         {tab === 'guide' ? (
@@ -140,7 +146,7 @@ export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, o
                 className="w-full bg-transparent text-[14.5px] placeholder-ink-3 focus:outline-none"
               />
             </div>
-            <ul className="mt-2 max-h-[400px] overflow-y-auto divide-y divide-line -mx-2">
+            <ul className="mt-2 max-h-[380px] overflow-y-auto divide-y divide-line -mx-2">
               {shown.map((r) => (
                 <li key={r.id}>
                   <button
@@ -148,9 +154,12 @@ export const DesktopPanel: React.FC<DesktopPanelProps> = ({ lang, onTrySample, o
                     onClick={() => onQuickQuote(r.id)}
                     className="w-full px-2 py-2.5 flex items-center gap-3 rounded-[12px] hover:bg-surface-2/70 transition-colors cursor-pointer text-left"
                   >
-                    <span className="w-9 h-9 rounded-full bg-surface-2 flex items-center justify-center text-[18px] shrink-0">
-                      {r.emoji || '🍜'}
-                    </span>
+                    <DishThumb
+                      refId={r.id}
+                      name={r.name_vi}
+                      category={r.category}
+                      className="w-11 h-11 rounded-[12px] text-[18px]"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[14.5px] font-semibold truncate">
                         {en ? r.name_en : r.name_vi}

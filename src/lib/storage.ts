@@ -36,6 +36,15 @@ export interface PassportStamp {
   collectedAt: number;
 }
 
+/** Short mark printed on a passport stamp, e.g. "Hàng Bạc" → "HB" */
+export function streetInitials(street: string): string {
+  return street
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join('')
+    .slice(0, 2);
+}
+
 // Start with an empty passport: every stamp must come from a real report.
 const DEFAULT_STAMPS: PassportStamp[] = [];
 

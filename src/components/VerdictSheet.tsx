@@ -5,6 +5,7 @@ import { formatShortVnd } from '../lib/parsePrice';
 import {
   Button,
   ConfidenceMeter,
+  DishThumb,
   IconButton,
   RangeBar,
   VerdictBadge,
@@ -198,8 +199,9 @@ export const VerdictSheet: React.FC<VerdictSheetProps> = ({
   return (
     <div
       data-testid="verdict-sheet"
-      className="absolute inset-0 bg-bg text-ink overflow-y-auto overscroll-contain px-5 pt-4 pb-6 flex flex-col z-40 animate-sheet-up"
+      className="absolute inset-x-0 bottom-0 top-[64px] rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.35)] bg-bg text-ink overflow-y-auto overscroll-contain px-5 pt-3 pb-6 flex flex-col z-40 animate-sheet-up"
     >
+      <div aria-hidden="true" className="w-10 h-1.5 rounded-full bg-grabber mx-auto mb-2 shrink-0" />
       {/* Top Bar matching Screenshot 06 */}
       <div className="flex items-center gap-3 mb-4">
         <IconButton
@@ -216,9 +218,12 @@ export const VerdictSheet: React.FC<VerdictSheetProps> = ({
 
       {/* Header: thumbnail, name_vi, name_en, VerdictBadge */}
       <div className="flex items-start gap-3.5 mb-4">
-        <div className="w-[58px] h-[58px] rounded-[16px] bg-surface-2 flex items-center justify-center text-[30px] shrink-0">
-          {ref?.emoji || '🍜'}
-        </div>
+        <DishThumb
+          refId={ref?.id}
+          name={titleVi}
+          category={ref?.category}
+          className="w-[72px] h-[72px] rounded-[18px] text-[28px]"
+        />
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-[26px] leading-tight text-ink">
             {titleVi}
