@@ -20,7 +20,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary:
         'bg-surface-2 text-ink hover:bg-surface-3 active:scale-[0.99]',
       ghost:
-        'bg-transparent text-brand hover:bg-brand-soft/60 active:scale-[0.99]',
+        'bg-transparent text-ink hover:bg-surface-2 active:scale-[0.99]',
     };
 
     return (

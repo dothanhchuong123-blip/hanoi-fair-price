@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   APIProvider,
   AdvancedMarker,
@@ -11,6 +11,10 @@ import { fetchMapsNearby } from '../agent/maps';
 import { EvaluatedItem, MapsNearbyResult, NearbyPlace } from '../agent/types';
 import { formatShortVnd } from '../lib/parsePrice';
 import { Button, Chip, IconButton, Sheet } from './ui';
+import { IllustratedMap } from './IllustratedMap';
+
+const MAP_ID =
+  ((import.meta as any).env?.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || 'DEMO_MAP_ID';
 
 interface NearbySheetProps {
   lang: 'en' | 'vi';
@@ -117,6 +121,31 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<MapsNearbyResult | null>(null);
   const [resolvedLocations, setResolvedLocations] = useState<PlaceLocationMap>({});
+  const [mapFailed, setMapFailed] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const mapBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // Google calls gm_authFailure when the key is rejected (bad key, billing off, site not allowed)
+  // and then paints its own grey "Oops" box. Watch for both and swap in our drawn map instead.
+  useEffect(() => {
+    const w = window as any;
+    const previous = w.gm_authFailure;
+    w.gm_authFailure = () => {
+      setMapFailed(true);
+      previous?.();
+    };
+    const box = mapBoxRef.current;
+    const observer = box
+      ? new MutationObserver(() => {
+          if (box.querySelector('.gm-err-container, .gm-err-content')) setMapFailed(true);
+        })
+      : null;
+    if (box && observer) observer.observe(box, { childList: true, subtree: true });
+    return () => {
+      w.gm_authFailure = previous;
+      observer?.disconnect();
+    };
+  }, []);
 
   const ref = item.reference;
   const dishVi = ref?.name_vi || item.perceived.name_vi;
@@ -167,6 +196,16 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
   ).trim();
   const hasGoogleMapsKey = Boolean(envMapsKey);
   const placesList = result?.places ?? [];
+  const fromGuide = Boolean(result?.is_sample);
+
+  const pinFor = (place: NearbyPlace) => {
+    const compare = place.price_high ?? place.price_low;
+    const isTypical = compare !== null && (typicalHigh === null || compare <= typicalHigh);
+    return {
+      label: formatPriceRange(place.price_low, place.price_high),
+      color: isTypical ? 'var(--fair)' : 'var(--warn)',
+    };
+  };
 
   const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${dishVi} (${dishEn}) near Hoàn Kiếm Hanoi`
@@ -178,53 +217,74 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
       className="absolute inset-0 z-30 flex flex-col justify-between bg-black/45 backdrop-blur-[2px]"
     >
       {/* Top header + optional Google Map (ONLY rendered when GOOGLE_MAPS_API_KEY exists) */}
-      <div className="relative flex-1 min-h-[140px] flex flex-col justify-between">
-        {hasGoogleMapsKey && (locationAllowed || demoMode) && (
-          <div className="absolute inset-0 z-0" data-testid="nearby-google-map">
-            <APIProvider apiKey={envMapsKey}>
-              <PlacesLocationResolver
-                places={placesList}
-                userCoords={effectiveCoords}
-                onResolved={(locs) =>
-                  setResolvedLocations((prev) => ({ ...prev, ...locs }))
-                }
-              />
-              <Map
-                defaultCenter={effectiveCoords}
-                defaultZoom={15}
-                mapId="DEMO_MAP_ID"
-                internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-                gestureHandling="greedy"
-                disableDefaultUI
-                className="w-full h-full"
-              >
-                {/* User pin ("You") */}
-                <AdvancedMarker position={effectiveCoords}>
-                  <div className="flex flex-col items-center">
-                    <div className="w-4 h-4 rounded-full bg-[#2563EB] border-2 border-white shadow-md" />
-                    <span className="mt-1 px-2 py-0.5 rounded-full bg-[#2563EB] text-white text-[11px] font-bold shadow">
-                      {lang === 'en' ? 'You' : 'Bạn'}
-                    </span>
-                  </div>
-                </AdvancedMarker>
-
-                {/* Place pins showing their price */}
-                {placesList.map((place) => {
-                  const resolved = resolvedLocations[place.place_id];
-                  const lat = resolved?.lat ?? place.lat;
-                  const lng = resolved?.lng ?? place.lng;
-                  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
-                  const priceLabel = formatPriceRange(place.price_low, place.price_high);
-                  return (
-                    <AdvancedMarker key={place.place_id} position={{ lat, lng }}>
-                      <div className="px-2.5 py-1 rounded-full bg-fair text-white font-mono font-bold text-[12px] shadow-md border border-white/80 whitespace-nowrap">
-                        {priceLabel}
+      <div className="relative flex-1 min-h-[220px] flex flex-col justify-between">
+        {(locationAllowed || demoMode) && (
+          <div className="absolute inset-0 z-0" ref={mapBoxRef}>
+            {hasGoogleMapsKey && !mapFailed ? (
+              <div className="absolute inset-0" data-testid="nearby-google-map">
+                <APIProvider apiKey={envMapsKey} onError={() => setMapFailed(true)}>
+                  <PlacesLocationResolver
+                    places={placesList}
+                    userCoords={effectiveCoords}
+                    onResolved={(locs) =>
+                      setResolvedLocations((prev) => ({ ...prev, ...locs }))
+                    }
+                  />
+                  <Map
+                    defaultCenter={effectiveCoords}
+                    defaultZoom={15}
+                    mapId={MAP_ID}
+                    internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+                    gestureHandling="greedy"
+                    disableDefaultUI
+                    className="w-full h-full"
+                  >
+                    <AdvancedMarker position={effectiveCoords}>
+                      <div className="relative">
+                        <span className="absolute inset-0 rounded-full bg-[#2563EB]/40 pulse-halo" />
+                        <span className="relative block w-4 h-4 rounded-full bg-[#2563EB] border-[3px] border-white shadow-md" />
                       </div>
                     </AdvancedMarker>
-                  );
-                })}
-              </Map>
-            </APIProvider>
+
+                    {placesList.map((place) => {
+                      const resolved = resolvedLocations[place.place_id];
+                      const lat = resolved?.lat ?? place.lat;
+                      const lng = resolved?.lng ?? place.lng;
+                      if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+                      const pin = pinFor(place);
+                      const selected = selectedPlaceId === place.place_id;
+                      return (
+                        <AdvancedMarker
+                          key={place.place_id}
+                          position={{ lat, lng }}
+                          onClick={() => setSelectedPlaceId(place.place_id)}
+                        >
+                          <div
+                            className={`px-2.5 py-1 rounded-full text-white font-bold text-[12px] tabular-nums border-2 border-white whitespace-nowrap transition-transform ${
+                              selected ? 'scale-110 shadow-pop' : 'shadow-card'
+                            }`}
+                            style={{ backgroundColor: pin.color }}
+                          >
+                            {pin.label}
+                          </div>
+                        </AdvancedMarker>
+                      );
+                    })}
+                  </Map>
+                </APIProvider>
+              </div>
+            ) : (
+              <IllustratedMap
+                lang={lang}
+                center={effectiveCoords}
+                places={placesList}
+                pinFor={pinFor}
+                selectedId={selectedPlaceId}
+                onSelect={setSelectedPlaceId}
+              />
+            )}
+            {/* Soft fade so the sheet edge reads cleanly over the map */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/25 to-transparent" />
           </div>
         )}
 
@@ -271,21 +331,19 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
                 : `${dishVi} giá tốt gần đây`}
             </h2>
             <p className="text-[13px] text-ink-2 mt-1 flex flex-wrap items-center gap-1.5">
-              {lang === 'en' ? (
+              {fromGuide ? (
+                <span>
+                  {lang === 'en'
+                    ? 'From our Old Quarter price guide · tap a pin to compare'
+                    : 'Từ bảng giá Phố cổ của chúng tôi · chạm ghim để so sánh'}
+                </span>
+              ) : lang === 'en' ? (
                 <span>
                   From <span translate="no">Google Maps</span> · prices from reviews &amp; reports
                 </span>
               ) : (
                 <span>
                   Từ <span translate="no">Google Maps</span> · giá từ đánh giá &amp; cộng đồng
-                </span>
-              )}
-              {result?.is_sample && (
-                <span
-                  data-testid="nearby-sample-badge"
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-warn-soft text-warn border border-warn/25"
-                >
-                  {lang === 'en' ? 'sample data' : 'dữ liệu mẫu'}
                 </span>
               )}
             </p>
@@ -396,13 +454,16 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid="nearby-place-row"
-                      className="p-3.5 rounded-[18px] bg-surface hover:bg-surface-2/70 border border-line flex items-center justify-between gap-3 transition-colors"
+                      onMouseEnter={() => setSelectedPlaceId(place.place_id)}
+                      className={`p-3.5 rounded-[18px] bg-surface hover:bg-surface-2/70 border flex items-center justify-between gap-3 transition-colors ${
+                        selectedPlaceId === place.place_id ? 'border-ink/40 shadow-card' : 'border-line'
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Food thumbnail */}
                         <div
                           aria-hidden="true"
-                          className="w-12 h-12 rounded-[14px] bg-[#E8DFD2] border border-line flex items-center justify-center text-[22px] shrink-0"
+                          className="w-12 h-12 rounded-[14px] bg-surface-2 border border-line flex items-center justify-center text-[22px] shrink-0"
                         >
                           {ref?.emoji || '🍜'}
                         </div>
@@ -410,11 +471,6 @@ export const NearbySheet: React.FC<NearbySheetProps> = ({
                         <div className="min-w-0">
                           <div className="font-bold text-[15.5px] text-ink leading-snug truncate flex items-center gap-1.5">
                             <span className="truncate">{place.name}</span>
-                            {place.is_sample && (
-                              <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 shrink-0">
-                                {lang === 'en' ? 'sample data' : 'dữ liệu mẫu'}
-                              </span>
-                            )}
                           </div>
 
                           <div className="text-[13px] text-ink-2 mt-0.5 flex items-center gap-1.5 flex-wrap">

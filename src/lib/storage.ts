@@ -149,3 +149,60 @@ export function saveCrowdReport(itemId: string, nameVi: string, paidVnd: number)
     allStamps: updatedStamps,
   };
 }
+
+// ─── Check history ───────────────────────────────────────────────────────────
+
+const HISTORY_KEY = 'cho_price_lens_history_v1';
+const HISTORY_LIMIT = 60;
+
+export interface HistoryEntry {
+  id: string;
+  item_id: string | null;
+  name_vi: string;
+  name_en: string;
+  emoji: string;
+  quoted_vnd: number;
+  unit: string;
+  verdict: 'fair' | 'slightly_high' | 'overpriced' | 'unknown';
+  typical_high_vnd: number | null;
+  timestamp: number;
+}
+
+export function getHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addHistory(entries: Omit<HistoryEntry, 'id' | 'timestamp'>[]): HistoryEntry[] {
+  const now = Date.now();
+  const fresh = entries.map((e, i) => ({ ...e, id: `h_${now}_${i}`, timestamp: now }));
+  const next = [...fresh, ...getHistory()].slice(0, HISTORY_LIMIT);
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore quota or private-mode errors; history is a convenience
+  }
+  window.dispatchEvent(new Event('cho-history'));
+  return next;
+}
+
+export function clearHistory(): void {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // Ignore
+  }
+  window.dispatchEvent(new Event('cho-history'));
+}
+
+/** Money a user avoided overpaying: what they were quoted above the typical top of the range */
+export function historySavings(entries: HistoryEntry[]): number {
+  return entries.reduce((sum, e) => {
+    if (e.typical_high_vnd === null || e.verdict === 'fair' || e.verdict === 'unknown') return sum;
+    return sum + Math.max(0, e.quoted_vnd - e.typical_high_vnd);
+  }, 0);
+}

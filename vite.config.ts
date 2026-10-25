@@ -10,6 +10,9 @@ export default defineConfig(() => {
       'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(
         process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || ''
       ),
+      'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': JSON.stringify(
+        process.env.GOOGLE_MAPS_MAP_ID || process.env.VITE_GOOGLE_MAPS_MAP_ID || ''
+      ),
     },
     resolve: {
       alias: {
